@@ -1,8 +1,26 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+/**
+ * lib/auth.tsx — Auth bridge
+ *
+ * Keeps the AuthProvider / useAuth surface that all route layouts use.
+ * State is sourced from Redux (store/slices/authSlice).
+ * logout() dispatches the real logoutThunk from thunks/.
+ */
 
-export type Role = "patient" | "doctor" | "admin";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { useAppSelector, useAppDispatch } from "@/store/hooks";
+import { selectAuthUser, type Role, type AuthUser as ReduxAuthUser } from "@/store/slices/authSlice";
+import { logoutThunk } from "@/thunks/authThunks";
+
+export type { Role };
 
 export interface AuthUser {
+  id?: number;
   name: string;
   email: string;
   role: Role;
@@ -12,52 +30,65 @@ export interface AuthUser {
 
 interface AuthCtx {
   user: AuthUser | null;
-  login: (email: string, role: Role) => void;
+  login: (email: string, role: Role, name?: string) => void;
   logout: () => void;
   setRole: (role: Role) => void;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-const ROLE_PROFILES: Record<Role, Omit<AuthUser, "email" | "role">> = {
-  patient: { name: "John Carter", title: "Member since 2024", avatarSeed: "JC" },
-  doctor: { name: "Dr. Aris Thorne", title: "Cardiology • Senior Consultant", avatarSeed: "AT" },
-  admin: { name: "Helena Vasquez", title: "Clinic Operations Lead", avatarSeed: "HV" },
-};
+function makeAvatar(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
-const STORAGE_KEY = "mediqueue.user";
+function toAuthUser(u: ReduxAuthUser): AuthUser {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    title: u.role === "doctor" ? "Doctor" : undefined,
+    avatarSeed: makeAvatar(u.name || u.email),
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const reduxUser = useAppSelector(selectAuthUser);
+  const dispatch = useAppDispatch();
+
+  // Shim for pages not yet migrated to Redux thunks
+  const [shimUser, setShimUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setUser(JSON.parse(raw));
-    } catch {}
-  }, []);
+    if (reduxUser) setShimUser(toAuthUser(reduxUser));
+    else setShimUser(null);
+  }, [reduxUser]);
 
-  const persist = (u: AuthUser | null) => {
-    setUser(u);
-    if (typeof window !== "undefined") {
-      if (u) localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-      else localStorage.removeItem(STORAGE_KEY);
-    }
-  };
+  const user = reduxUser ? toAuthUser(reduxUser) : shimUser;
 
   return (
     <Ctx.Provider
       value={{
         user,
-        login: (email, role) => {
-          const p = ROLE_PROFILES[role];
-          persist({ ...p, email, role });
+        login: (email, role, name) => {
+          setShimUser({
+            email,
+            role,
+            name: name ?? email,
+            avatarSeed: makeAvatar(name ?? email),
+          });
         },
-        logout: () => persist(null),
+        logout: () => {
+          setShimUser(null);
+          dispatch(logoutThunk());
+        },
         setRole: (role) => {
-          const p = ROLE_PROFILES[role];
-          persist({ ...p, email: user?.email ?? `${role}@mediqueue.io`, role });
+          if (user) setShimUser({ ...user, role });
         },
       }}
     >

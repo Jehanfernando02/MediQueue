@@ -7,10 +7,15 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { Provider } from "react-redux";
+import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
+import { store } from "@/store/store";
+import { restoreSessionThunk } from "@/thunks/authThunks";
+import { useAppDispatch } from "@/store/hooks";
 
 function NotFoundComponent() {
   return (
@@ -104,14 +109,27 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Restores session from localStorage refresh token on app boot */
+function SessionRestorer() {
+  const dispatch = useAppDispatch();
+  useEffect(() => {
+    dispatch(restoreSessionThunk());
+  }, [dispatch]);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Outlet />
-        <Toaster richColors position="top-right" />
-      </AuthProvider>
-    </QueryClientProvider>
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SessionRestorer />
+          <Outlet />
+          <Toaster richColors position="top-right" />
+        </AuthProvider>
+      </QueryClientProvider>
+    </Provider>
   );
 }
+
