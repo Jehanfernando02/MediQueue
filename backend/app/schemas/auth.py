@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr, field_validator
+import uuid
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from app.models.user import UserRole
 
 
@@ -29,11 +30,13 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    model_config = ConfigDict(json_encoders={uuid.UUID: str})
+    
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     role: str
-    user_id: int
+    user_id: uuid.UUID
     name: str
     email: str
 
