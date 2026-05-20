@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 from functools import lru_cache
 import os
 
@@ -25,20 +25,25 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS — Comma-separated origins in env, parsed as list
-    ALLOWED_ORIGINS: list[str] = Field(
-        default=["http://localhost:8080", "http://localhost:8081", "http://localhost:8082"],
-        description="Comma-separated CORS origins"
-    )
+    # CORS — Comma-separated origins (stored as string, parsed on demand)
+    ALLOWED_ORIGINS: str = "http://localhost:8080,http://localhost:8081,http://localhost:8082"
 
     # Rate limiting
     RATE_LIMIT_BOOKING_PER_MINUTE: int = 5
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        # Parse ALLOWED_ORIGINS if it comes as a string (from env vars)
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        """Parse comma-separated string into list"""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+    
+    def get_allowed_origins_list(self) -> list[str]:
+        """Get ALLOWED_ORIGINS as a list"""
         if isinstance(self.ALLOWED_ORIGINS, str):
-            self.ALLOWED_ORIGINS = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+            return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        return self.ALLOWED_ORIGINS
 
 
 @lru_cache
