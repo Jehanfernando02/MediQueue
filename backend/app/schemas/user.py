@@ -1,10 +1,11 @@
+import uuid
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
 from app.models.user import UserRole
 
 
 class UserOut(BaseModel):
-    id: int
+    id: uuid.UUID
     email: EmailStr
     role: UserRole
     is_active: bool
@@ -14,8 +15,8 @@ class UserOut(BaseModel):
 
 
 class PatientOut(BaseModel):
-    id: int
-    user_id: int
+    id: uuid.UUID
+    user_id: uuid.UUID
     name: str
     dob: str | None = None
     blood_type: str | None = None

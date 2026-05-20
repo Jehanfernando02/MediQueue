@@ -9,7 +9,8 @@ from app.config import settings
 from app.database import engine
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging_middleware import LoggingMiddleware
-from app.routers import auth
+from app.routers import auth, doctors, departments, appointments, queue, notifications, reports, audit, demo
+
 
 # Configure structured logging
 logging.basicConfig(
@@ -51,13 +52,19 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=False,
+    allow_origins=settings.ALLOWED_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
+
+app.add_middleware(AuditMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(RequestIDMiddleware)
+
 
 
 
@@ -88,16 +95,22 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ---------------------------------------------------------------------------
 API_PREFIX = "/api/v1"
 
+# Phase 1 — Auth
 app.include_router(auth.router, prefix=API_PREFIX)
 
-# Phase 2 routers (added as each service is built):
-# app.include_router(doctors.router, prefix=API_PREFIX)
-# app.include_router(departments.router, prefix=API_PREFIX)
-# app.include_router(appointments.router, prefix=API_PREFIX)
-# app.include_router(queue.router, prefix=API_PREFIX)
-# app.include_router(notifications.router, prefix=API_PREFIX)
-# app.include_router(audit_logs.router, prefix=API_PREFIX)
-# app.include_router(analytics.router, prefix=API_PREFIX)
+# Phase 2 — Core Services
+app.include_router(doctors.router, prefix=API_PREFIX)
+app.include_router(departments.router, prefix=API_PREFIX)
+app.include_router(appointments.router, prefix=API_PREFIX)
+app.include_router(queue.router, prefix=API_PREFIX)
+app.include_router(notifications.router, prefix=API_PREFIX)
+
+# Phase 3 — Advanced
+app.include_router(reports.router, prefix=API_PREFIX)
+app.include_router(audit.router, prefix=API_PREFIX)
+app.include_router(demo.router, prefix=API_PREFIX)
+
+
 
 
 # ---------------------------------------------------------------------------

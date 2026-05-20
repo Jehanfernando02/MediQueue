@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
+from pydantic import Field
+import os
 
 
 class Settings(BaseSettings):
@@ -23,15 +24,20 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS
-    ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:8080",
-        "http://localhost:8081",
-        "http://localhost:8082",
-    ]
+    # CORS — Comma-separated origins in env, parsed as list
+    ALLOWED_ORIGINS: list[str] = Field(
+        default=["http://localhost:8080", "http://localhost:8081", "http://localhost:8082"],
+        description="Comma-separated CORS origins"
+    )
 
     # Rate limiting
     RATE_LIMIT_BOOKING_PER_MINUTE: int = 5
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Parse ALLOWED_ORIGINS if it comes as a string (from env vars)
+        if isinstance(self.ALLOWED_ORIGINS, str):
+            self.ALLOWED_ORIGINS = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
 
 
 @lru_cache

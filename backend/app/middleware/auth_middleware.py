@@ -1,4 +1,5 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
+
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,10 +12,14 @@ bearer_scheme = HTTPBearer()
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    return await auth_service.get_current_user(db, credentials.credentials)
+    user = await auth_service.get_current_user(db, credentials.credentials)
+    request.state.user = user
+    return user
+
 
 
 def require_roles(*roles: UserRole):
