@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import uuid
 from datetime import timedelta, datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,7 +137,7 @@ class AuthService:
         await redis.delete(redis_key)
 
         # Fetch user
-        result = await db.execute(select(User).where(User.id == int(stored_user_id)))
+        result = await db.execute(select(User).where(User.id == uuid.UUID(stored_user_id)))
         user: User | None = result.scalar_one_or_none()
         if not user or not user.is_active:
             raise UnauthorizedError("User not found or inactive.")
@@ -181,7 +182,7 @@ class AuthService:
         if payload.get("type") != "access":
             raise UnauthorizedError("Token type mismatch.")
 
-        user_id = int(payload["sub"])
+        user_id = uuid.UUID(payload["sub"])
         result = await db.execute(select(User).where(User.id == user_id))
         user: User | None = result.scalar_one_or_none()
 
