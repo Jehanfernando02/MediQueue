@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
 from functools import lru_cache
 import os
 
@@ -31,19 +30,9 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_BOOKING_PER_MINUTE: int = 5
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v):
-        """Parse comma-separated string into list"""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
-    
     def get_allowed_origins_list(self) -> list[str]:
-        """Get ALLOWED_ORIGINS as a list"""
-        if isinstance(self.ALLOWED_ORIGINS, str):
-            return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
-        return self.ALLOWED_ORIGINS
+        """Get ALLOWED_ORIGINS as a list by splitting comma-separated string"""
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 
 @lru_cache
