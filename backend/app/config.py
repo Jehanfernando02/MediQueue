@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://mediqueue:mediqueue@localhost:5432/mediqueue"
 
-    # Redis
+    # Redis (optional — only needed if using caching/Celery)
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # JWT
