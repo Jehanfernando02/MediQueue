@@ -8,14 +8,14 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Provider } from "react-redux";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { store } from "@/store/store";
 import { restoreSessionThunk } from "@/thunks/authThunks";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 function NotFoundComponent() {
   return (
@@ -109,13 +109,51 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Restores session from localStorage refresh token on app boot */
-function SessionRestorer() {
+/**
+ * AppGate — blocks rendering the app until session restoration is complete.
+ *
+ * On page refresh, Redux is cleared (in-memory). Without this gate,
+ * AppShell would see `user = null` and immediately redirect to /login
+ * before the async restoreSessionThunk() finishes.
+ *
+ * The gate:
+ *  - If no refresh token exists → resolves instantly (no spinner flash)
+ *  - If a token exists → waits for the restore promise to settle
+ */
+function AppGate({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    dispatch(restoreSessionThunk());
-  }, [dispatch]);
-  return null;
+    const hasToken =
+      typeof window !== "undefined" &&
+      !!localStorage.getItem("mediqueue.refresh_token");
+
+    if (!hasToken) {
+      // No token to restore — skip straight to ready
+      setReady(true);
+      return;
+    }
+
+    // Attempt session restore; mark ready when settled (success or failure)
+    (dispatch(restoreSessionThunk()) as unknown as Promise<void>).finally(() => {
+      setReady(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+          <p className="mt-4 text-white text-sm">Restoring your session…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 function RootComponent() {
@@ -124,9 +162,10 @@ function RootComponent() {
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <SessionRestorer />
-          <Outlet />
-          <Toaster richColors position="top-right" />
+          <AppGate>
+            <Outlet />
+            <Toaster richColors position="top-right" />
+          </AppGate>
         </AuthProvider>
       </QueryClientProvider>
     </Provider>
