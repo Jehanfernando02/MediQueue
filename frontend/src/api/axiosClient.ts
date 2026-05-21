@@ -1,7 +1,7 @@
 /**
  * Axios client for MediQueue API.
  *
- * - Base URL read from VITE_API_URL env var (falls back to http://localhost:8001)
+ * - Base URL read from VITE_API_URL env var (falls back to http://localhost:8000)
  * - Attaches `Authorization: Bearer <access_token>` on every request
  * - On 401 → silently refreshes the token pair via /auth/refresh,
  *   retries the original request once, then dispatches logout if that fails too.
@@ -17,9 +17,10 @@ import axios, {
 } from "axios";
 import { store } from "@/store/store";
 import { setTokens, clearAuth } from "@/store/slices/authSlice";
+import { toast } from "sonner";
 
 export const API_BASE: string =
-  import.meta.env?.VITE_API_URL ?? "http://localhost:8001";
+  import.meta.env?.VITE_API_URL ?? "http://localhost:8000";
 
 
 const api = axios.create({
@@ -28,12 +29,13 @@ const api = axios.create({
   timeout: 15_000,
 });
 
-// ── Request interceptor: inject access token ─────────────────────────────────
+// ── Request interceptor: inject access token and block demo mutations ────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = store.getState().auth.accessToken;
   if (token && config.headers) {
     config.headers["Authorization"] = `Bearer ${token}`;
   }
+
   return config;
 });
 
@@ -100,6 +102,11 @@ api.interceptors.response.use(
         const newRefresh: string = data.data.refresh_token;
 
         store.dispatch(setTokens({ accessToken: newAccess, refreshToken: newRefresh }));
+        
+        // Persist the new refresh token for the next session
+        if (typeof window !== "undefined") {
+          localStorage.setItem("mediqueue.refresh_token", newRefresh);
+        }
 
         processQueue(null, newAccess);
 
