@@ -1,6 +1,6 @@
 import logging
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -93,11 +93,13 @@ async def demo_login(
     user = result.scalar_one_or_none()
     
     if not user:
-        # If database is not seeded yet, seed it automatically!
-        logger.warning("Demo user %s not found. Auto-seeding database first.", email)
-        await demo_service.seed_sandbox_data(db)
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalar_one()
+        # Demo user not found — return error instead of auto-seeding
+        # (Auto-seeding disabled due to schema mismatch: models use UUID but migration uses INTEGER)
+        logger.warning("Demo user %s not found. Please seed database manually or create demo user.", email)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Demo user with email '{email}' not found. Database may not be seeded."
+        )
         
     # Standard issue of JWT tokens (access + refresh)
     tokens = await auth_service._issue_tokens(user)
