@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Heart, ArrowRight, ShieldCheck, Activity, CalendarCheck, Sparkles } from "lucide-react";
+import { Heart, ArrowRight, ShieldCheck, Activity, CalendarCheck, Sparkles, MoveRight } from "lucide-react";
 import { useAuth, homeForRole } from "@/lib/auth";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,122 +17,142 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [demoCompleted, setDemoCompleted] = useState(false);
 
   useEffect(() => {
     if (user) navigate({ to: homeForRole(user.role) });
   }, [user, navigate]);
 
+  useEffect(() => {
+    const isCompleted = localStorage.getItem("mediqueue.demo_completed") === "true";
+    setDemoCompleted(isCompleted);
+  }, []);
+
   return (
-    <div className="min-h-screen soft-gradient">
-      <header className="max-w-7xl mx-auto px-6 lg:px-10 h-20 flex items-center justify-between">
+    <div className="min-h-screen bg-background dot-grid selection:bg-brand/30 overflow-hidden">
+      {/* System Showcase Banner */}
+      {!demoCompleted && (
+        <div className="bg-slate-950 border-b border-white/10 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white relative z-50">
+          🚀 <span className="text-brand">Interactive System Showcase:</span> One-click showcase mode is active. Click <a href="/login?demo=true" onClick={(e) => { e.preventDefault(); sessionStorage.setItem("mediqueue.showcase_active", "true"); localStorage.removeItem("mediqueue.demo_completed"); window.location.href = "/login?demo=true"; }} className="underline text-clinical hover:text-brand transition-colors">Explore Demo</a> to bypass forms and view all 3 dashboards.
+        </div>
+      )}
+
+      {/* Decorative Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] size-[500px] bg-brand/10 blur-[120px] rounded-full animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] size-[500px] bg-clinical/10 blur-[120px] rounded-full animate-pulse" />
+
+      <header className="max-w-7xl mx-auto px-6 lg:px-10 h-24 flex items-center justify-between relative z-50">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-brand text-brand-foreground grid place-items-center shadow-lg shadow-brand/25">
-            <Heart className="size-5" strokeWidth={2.5} />
+          <div className="size-12 rounded-2xl bg-brand text-brand-foreground grid place-items-center shadow-2xl shadow-brand/20 shimmer-sweep">
+            <Heart className="size-6" strokeWidth={3} />
           </div>
           <div className="leading-tight">
-            <div className="font-bold tracking-tight">MediQueue</div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Clinical OS</div>
+            <div className="text-xl font-black tracking-tighter text-foreground">MediQueue</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Clinical OS</div>
           </div>
         </div>
-        <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
-          <a href="#features" className="hover:text-foreground transition-colors">Product</a>
-          <a href="#roles" className="hover:text-foreground transition-colors">For teams</a>
-          <a href="#trust" className="hover:text-foreground transition-colors">Security</a>
+        <nav className="hidden md:flex items-center gap-10 text-[10px] uppercase tracking-widest font-black text-muted-foreground">
+          <a href="#features" className="hover:text-brand transition-colors">Product</a>
+          <a href="#teams" className="hover:text-brand transition-colors">For teams</a>
+          <a href="#security" className="hover:text-brand transition-colors">Security</a>
         </nav>
-        <div className="flex items-center gap-3">
-          <Link to="/login" className="text-sm font-semibold text-muted-foreground hover:text-foreground">
+        <div className="flex items-center gap-6">
+          <Link to="/login" className="text-[10px] uppercase tracking-widest font-black text-muted-foreground hover:text-brand transition-colors">
             Sign in
           </Link>
           <Link
             to="/register"
-            className="rounded-full bg-brand text-brand-foreground px-4 py-2 text-sm font-semibold shadow-lg shadow-brand/25 hover:scale-105 transition-transform"
+            className="rounded-2xl bg-brand text-brand-foreground px-6 py-3 text-[10px] uppercase tracking-widest font-black shadow-2xl shadow-brand/30 hover:scale-105 transition-all shimmer-sweep"
           >
             Get started
           </Link>
         </div>
       </header>
 
-      <section className="max-w-7xl mx-auto px-6 lg:px-10 pt-12 lg:pt-24 pb-20 grid lg:grid-cols-2 gap-12 items-center">
-        <div className="fade-in">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/60 text-xs font-medium text-muted-foreground">
-            <Sparkles className="size-3.5 text-brand" />
-            Built for hospital-grade workflows
+      <section className="max-w-7xl mx-auto px-6 lg:px-10 pt-20 lg:pt-32 pb-32 grid lg:grid-cols-2 gap-20 items-center relative z-10">
+        <div className="stagger-in" style={{ "--delay": "0.1s" } as any}>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-card/40 backdrop-blur-md text-[10px] font-black uppercase tracking-widest text-brand mb-8 shadow-sm">
+            <Sparkles className="size-3.5" />
+            Modern Clinical Excellence
           </div>
-          <h1 className="mt-5 text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
-            The operating system for{" "}
-            <span className="bg-gradient-to-r from-brand to-clinical bg-clip-text text-transparent">
-              modern clinics
-            </span>
-            .
+          <h1 className="text-6xl lg:text-8xl font-black tracking-tighter leading-[0.85] text-foreground">
+            The OS for <br />
+            <span className="text-gradient">Modern Clinics.</span>
           </h1>
-          <p className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed">
-            MediQueue replaces clipboards and call-back lists with a calm, real-time
-            view of every appointment, patient and doctor in your clinic.
+          <p className="mt-10 text-xl text-muted-foreground max-w-xl leading-relaxed font-medium">
+            MediQueue replaces chaotic paper trails and legacy software with a calm, high-performance view of your entire clinical practice.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-12 flex flex-wrap gap-5">
             <Link
               to="/register"
-              className="inline-flex items-center gap-2 rounded-full bg-brand text-brand-foreground px-6 py-3 text-sm font-semibold shadow-xl shadow-brand/25 hover:scale-105 transition-transform"
+              className="group inline-flex items-center gap-3 rounded-2xl bg-brand text-brand-foreground px-8 py-4 text-xs font-black uppercase tracking-widest shadow-2xl shadow-brand/40 hover:scale-105 transition-all shimmer-sweep"
             >
-              Start free trial <ArrowRight className="size-4" />
+              Start Free Trial <MoveRight className="size-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 backdrop-blur px-6 py-3 text-sm font-semibold hover:bg-card transition-colors"
+            <a
+              href="/login?demo=true"
+              onClick={(e) => { e.preventDefault(); sessionStorage.setItem("mediqueue.showcase_active", "true"); localStorage.removeItem("mediqueue.demo_completed"); window.location.href = "/login?demo=true"; }}
+              className="inline-flex items-center gap-3 rounded-2xl border border-border bg-card/40 backdrop-blur-md px-8 py-4 text-xs font-black uppercase tracking-widest hover:bg-muted transition-all shadow-sm"
             >
-              Explore demo
-            </Link>
+              Explore Demo
+            </a>
           </div>
-          <div className="mt-10 flex items-center gap-6 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2"><ShieldCheck className="size-4 text-clinical" /> HIPAA-ready</div>
-            <div className="flex items-center gap-2"><Activity className="size-4 text-clinical" /> Real-time queue</div>
-            <div className="flex items-center gap-2"><CalendarCheck className="size-4 text-clinical" /> Smart scheduling</div>
+          <div className="mt-16 flex items-center gap-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
+            <div className="flex items-center gap-2"><Activity className="size-4 text-clinical" /> REAL-TIME QUEUE</div>
+            <div className="flex items-center gap-2"><CalendarCheck className="size-4 text-clinical" /> SMART SLOTS</div>
           </div>
         </div>
 
-        <div className="relative fade-in">
-          <div className="absolute -inset-6 bg-gradient-to-tr from-brand/20 to-clinical/20 blur-3xl rounded-[40px]" />
-          <div className="relative glass-card rounded-3xl p-6 shadow-2xl shadow-brand/10">
-            <div className="flex items-center justify-between mb-5">
+        <div className="relative stagger-in" style={{ "--delay": "0.3s" } as any}>
+          <div className="absolute -inset-10 bg-gradient-to-tr from-brand/20 to-clinical/20 blur-[100px] rounded-[60px] animate-pulse" />
+
+          <div className="relative glass-card rounded-[2.5rem] p-8 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] border-white/20 transform perspective-[1000px] rotate-y-[-10deg] rotate-x-[5deg] hover:rotate-0 transition-transform duration-700 ease-out">
+            <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-brand to-clinical" />
+
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Today's queue</div>
-                <div className="text-lg font-bold">St. Jude Medical • Cardiology</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Clinic Status</div>
+                <div className="text-2xl font-black tracking-tighter">St. Jude Medical Center</div>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-clinical-soft text-clinical text-[10px] font-bold uppercase">
-                <span className="size-1.5 rounded-full bg-clinical pulse-dot" /> Live
+              <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-clinical/10 text-clinical text-[10px] font-black uppercase tracking-widest shadow-sm">
+                <span className="size-2 rounded-full bg-clinical pulse-dot" /> Live Dashboard
               </span>
             </div>
-            <div className="space-y-3">
+
+            <div className="space-y-4">
               {[
-                { n: "Sarah Jenkins", t: "09:15", s: "In progress", tone: "clinical" },
+                { n: "Sarah Jenkins", t: "09:15", s: "Consulting", tone: "clinical" },
                 { n: "Marcus Lewis", t: "09:40", s: "Arrived", tone: "brand" },
                 { n: "Elena Halloway", t: "10:05", s: "Scheduled", tone: "muted" },
-              ].map((r) => (
-                <div key={r.n} className="flex items-center gap-4 p-3 rounded-2xl bg-background/60 border border-border">
-                  <div className="size-10 rounded-xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-bold text-xs">
+              ].map((r, i) => (
+                <div key={r.n} className="flex items-center gap-4 p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md shadow-sm transition-all hover:bg-white/10 group/item">
+                  <div className="size-12 rounded-2xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-black text-sm shadow-lg group-hover/item:scale-110 transition-transform">
                     {r.n.split(" ").map((s) => s[0]).join("")}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate">{r.n}</div>
-                    <div className="text-xs text-muted-foreground">Room 304 • Dr. Thorne</div>
+                    <div className="text-base font-bold truncate">{r.n}</div>
+                    <div className="text-xs text-muted-foreground font-medium">Room 304 • Cardiology</div>
                   </div>
-                  <div className="text-xs font-mono text-muted-foreground">{r.t}</div>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full
-                    ${r.tone === "clinical" ? "bg-clinical-soft text-clinical"
-                      : r.tone === "brand" ? "bg-brand-soft text-brand"
-                      : "bg-muted text-muted-foreground"}`}>{r.s}</span>
+                  <div className="text-xs font-mono font-bold text-muted-foreground/60">{r.t}</div>
+                  <span className={cn(
+                    "text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border shadow-sm",
+                    r.tone === "clinical" ? "bg-clinical/10 text-clinical border-clinical/20"
+                      : r.tone === "brand" ? "bg-brand/10 text-brand border-brand/20"
+                        : "bg-muted text-muted-foreground border-border"
+                  )}>{r.s}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
+
+            <div className="mt-8 grid grid-cols-3 gap-4">
               {[
-                { l: "Patients", v: "142" },
-                { l: "Avg wait", v: "14m" },
-                { l: "On-time", v: "94%" },
+                { l: "Patients Today", v: "142", t: "brand" },
+                { l: "Avg. Wait", v: "14m", t: "clinical" },
+                { l: "Efficiency", v: "94%", t: "default" },
               ].map((s) => (
-                <div key={s.l} className="rounded-2xl border border-border bg-background/40 p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{s.l}</div>
-                  <div className="text-xl font-bold mt-1">{s.v}</div>
+                <div key={s.l} className="rounded-3xl border border-white/5 bg-white/5 p-4 backdrop-blur-md">
+                  <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">{s.l}</div>
+                  <div className={cn("text-2xl font-black tracking-tighter", s.t === 'brand' ? 'text-brand' : s.t === 'clinical' ? 'text-clinical' : 'text-foreground')}>{s.v}</div>
                 </div>
               ))}
             </div>
@@ -139,10 +160,17 @@ function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-border">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-6 flex items-center justify-between text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} MediQueue, Inc.</span>
-          <span>Designed for hospitals that move fast.</span>
+      <footer className="border-t border-border relative z-10 bg-background/40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-12 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <Heart className="size-4 text-brand" />
+            <span>© {new Date().getFullYear()} MediQueue, Inc. All rights reserved.</span>
+          </div>
+          <div className="flex items-center gap-10">
+            <a href="#" className="hover:text-brand transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-brand transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-brand transition-colors">Contact Sales</a>
+          </div>
         </div>
       </footer>
     </div>
