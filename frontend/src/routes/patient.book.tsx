@@ -1,40 +1,48 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+
+import { useState, useEffect } from "react";
 import { GlassCard, Pill } from "@/components/ui/glass";
-import { Search, Filter, Star, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { Search, Filter, Star, ChevronRight, ChevronLeft, CheckCircle2, Loader2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchDoctorsThunk } from "@/thunks/doctorThunks";
+import { fetchDepartmentsThunk } from "@/thunks/departmentThunks";
+import { bookAppointmentThunk } from "@/thunks/appointmentThunks";
+import { selectDoctors, selectDoctorStatus, selectDoctorSlots } from "@/store/slices/doctorSlice";
+import { selectDepartments } from "@/store/slices/departmentSlice";
+import { selectAppointmentStatus } from "@/store/slices/appointmentSlice";
+import { fetchDoctorSlotsThunk } from "@/thunks/doctorThunks";
+import type { Doctor } from "@/store/slices/doctorSlice";
 
 export const Route = createFileRoute("/patient/book")({
   head: () => ({ meta: [{ title: "Book appointment — MediQueue" }] }),
   component: Book,
 });
 
-const SPECIALTIES = ["All", "Cardiology", "Dermatology", "Pediatrics", "Neurology", "Orthopedics"];
-
-const DOCTORS = [
-  { name: "Dr. Aris Thorne", spec: "Cardiology", rating: 4.9, reviews: 312, next: "Today", clinic: "St. Jude Medical", price: "$120", initials: "AT" },
-  { name: "Dr. Sarah Chen", spec: "Dermatology", rating: 4.8, reviews: 198, next: "Tomorrow", clinic: "Pacific Care", price: "$95", initials: "SC" },
-  { name: "Dr. Marcus Lee", spec: "Pediatrics", rating: 4.9, reviews: 421, next: "Today", clinic: "Northgate Clinic", price: "$80", initials: "ML" },
-  { name: "Dr. Priya Rao", spec: "Neurology", rating: 5.0, reviews: 86, next: "Oct 16", clinic: "St. Jude Medical", price: "$180", initials: "PR" },
-];
-
-const SLOTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00"];
-
 function Book() {
+  const dispatch = useAppDispatch();
+  const doctors = useAppSelector(selectDoctors);
+  const departments = useAppSelector(selectDepartments);
+  const doctorStatus = useAppSelector(selectDoctorStatus);
+  const apptStatus = useAppSelector(selectAppointmentStatus);
+  const slots = useAppSelector(selectDoctorSlots);
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [spec, setSpec] = useState("All");
+  const [selectedDept, setSelectedDept] = useState("All");
   const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState<typeof DOCTORS[number] | null>(null);
+  const [picked, setPicked] = useState<Doctor | null>(null);
   const [day, setDay] = useState(0);
   const [slot, setSlot] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [booking, setBooking] = useState(false);
 
-  const filtered = DOCTORS.filter(
-    (d) => (spec === "All" || d.spec === spec) && d.name.toLowerCase().includes(query.toLowerCase()),
-  );
+  useEffect(() => {
+    dispatch(fetchDoctorsThunk());
+    dispatch(fetchDepartmentsThunk());
+  }, [dispatch]);
 
   const today = new Date();
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -42,6 +50,45 @@ function Book() {
     d.setDate(today.getDate() + i);
     return d;
   });
+
+  useEffect(() => {
+    if (picked && step === 2) {
+      const selectedDate = days[day].toISOString().split('T')[0];
+      dispatch(fetchDoctorSlotsThunk(picked.id, selectedDate));
+    }
+  }, [dispatch, picked, day, step]);
+
+  const filtered = doctors.filter(
+    (d) => {
+      const matchesDept = selectedDept === "All" || d.department_id === selectedDept;
+      const matchesQuery = d.name.toLowerCase().includes(query.toLowerCase());
+      return matchesDept && matchesQuery;
+    }
+  );
+
+  const handleConfirm = async () => {
+    if (!picked || !slot) return;
+    setBooking(true);
+    
+    const selectedDate = days[day].toISOString().split('T')[0];
+    const result = await dispatch(bookAppointmentThunk({
+      doctor_id: picked.id,
+      date: selectedDate,
+      start_time: slot,
+      reason: "General consultation"
+    }));
+
+    setBooking(false);
+    if (result.success) {
+      setConfirmOpen(false);
+      setStep(3);
+      toast.success("Appointment booked successfully!");
+    } else {
+      toast.error(result.error || "Failed to book appointment");
+    }
+  };
+
+  const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <div className="space-y-8">
@@ -80,53 +127,75 @@ function Book() {
                 className="bg-transparent outline-none border-none w-full text-sm"
               />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-border text-xs font-semibold">
-              <Filter className="size-3.5" /> Filters
-            </button>
           </div>
           <div className="flex gap-2 mt-4 flex-wrap">
-            {SPECIALTIES.map((s) => (
+            <button
+              onClick={() => setSelectedDept("All")}
+              className={[
+                "px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
+                selectedDept === "All" ? "bg-brand text-brand-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              All
+            </button>
+            {departments.map((d) => (
               <button
-                key={s} onClick={() => setSpec(s)}
+                key={d.id} onClick={() => setSelectedDept(d.id)}
                 className={[
                   "px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-                  spec === s ? "bg-brand text-brand-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
+                  selectedDept === d.id ? "bg-brand text-brand-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
-                {s}
+                {d.name}
               </button>
             ))}
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4 mt-6">
-            {filtered.map((d) => (
-              <button
-                key={d.name}
-                onClick={() => { setPicked(d); setStep(2); }}
-                className="text-left group p-5 rounded-2xl border border-border hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5 transition-all bg-card"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="size-14 rounded-2xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-bold">
-                    {d.initials}
+          {doctorStatus === "loading" ? (
+            <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+              <span className="text-sm">Finding best doctors…</span>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4 mt-6">
+              {filtered.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => { setPicked(d); setStep(2); }}
+                  className="text-left group p-5 rounded-2xl border border-border hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5 transition-all bg-card"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="size-14 rounded-2xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-bold">
+                      {getInitials(d.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold">{d.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.specialty} • {departments.find(dept => dept.id === d.department_id)?.name || "General Clinic"}
+                      </div>
+                    </div>
+                    <ChevronRight className="size-4 text-muted-foreground group-hover:text-brand transition-colors" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold">{d.name}</div>
-                    <div className="text-xs text-muted-foreground">{d.spec} • {d.clinic}</div>
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <Star className="size-3.5 text-warn fill-warn" />
+                      <span className="font-semibold">{d.rating || "5.0"}</span>
+                      <span className="text-muted-foreground">({d.review_count || "0"})</span>
+                    </div>
+                    <Pill tone={d.status === "active" ? "clinical" : "muted"}>
+                      {d.status === "active" ? "Available Today" : d.status}
+                    </Pill>
+                    <div className="text-sm font-semibold">${d.consultation_fee}</div>
                   </div>
-                  <ChevronRight className="size-4 text-muted-foreground group-hover:text-brand transition-colors" />
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <div className="col-span-2 py-10 text-center text-muted-foreground">
+                  No doctors found matching your criteria.
                 </div>
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Star className="size-3.5 text-warn fill-warn" />
-                    <span className="font-semibold">{d.rating}</span>
-                    <span className="text-muted-foreground">({d.reviews})</span>
-                  </div>
-                  <Pill tone={d.next === "Today" ? "clinical" : "muted"}>{d.next}</Pill>
-                  <div className="text-sm font-semibold">{d.price}</div>
-                </div>
-              </button>
-            ))}
-          </div>
+              )}
+            </div>
+          )}
         </GlassCard>
       )}
 
@@ -136,13 +205,17 @@ function Book() {
             <button onClick={() => setStep(1)} className="size-9 rounded-full border border-border grid place-items-center hover:bg-muted">
               <ChevronLeft className="size-4" />
             </button>
-            <div className="size-12 rounded-2xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-bold">{picked.initials}</div>
+            <div className="size-12 rounded-2xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-bold">
+              {getInitials(picked.name)}
+            </div>
             <div className="flex-1">
               <div className="font-bold">{picked.name}</div>
-              <div className="text-xs text-muted-foreground">{picked.spec} • {picked.clinic}</div>
+              <div className="text-xs text-muted-foreground">
+                {picked.specialty} • {departments.find(dept => dept.id === picked.department_id)?.name || "General Clinic"}
+              </div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold">{picked.price}</div>
+              <div className="text-lg font-bold">${picked.consultation_fee}</div>
               <div className="text-[10px] uppercase text-muted-foreground tracking-widest">Per visit</div>
             </div>
           </div>
@@ -172,28 +245,43 @@ function Book() {
 
           <div className="mt-6">
             <h4 className="text-sm font-semibold mb-3">Available slots</h4>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              {SLOTS.map((s) => {
-                const active = slot === s;
-                return (
-                  <button
-                    key={s} onClick={() => setSlot(s)}
-                    className={[
-                      "py-2.5 rounded-xl border text-sm font-semibold transition-all",
-                      active ? "bg-brand text-brand-foreground border-brand" : "border-border hover:bg-muted",
-                    ].join(" ")}
-                  >
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="text-[10px] text-muted-foreground mb-3 italic">* Slots are subject to availability upon confirmation.</p>
+            {doctorStatus === "loading" ? (
+              <div className="flex items-center gap-2 py-4 text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                <span className="text-xs">Checking availability…</span>
+              </div>
+            ) : slots.length === 0 ? (
+              <div className="py-4 text-sm text-muted-foreground">
+                No slots available for this date.
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                {slots.map((s) => {
+                  const active = slot === s.start_time;
+                  return (
+                    <button
+                      key={s.id} 
+                      disabled={!s.is_available}
+                      onClick={() => setSlot(s.start_time)}
+                      className={[
+                        "py-2.5 rounded-xl border text-sm font-semibold transition-all",
+                        active ? "bg-brand text-brand-foreground border-brand" : "border-border hover:bg-muted",
+                        !s.is_available && "opacity-30 cursor-not-allowed grayscale"
+                      ].join(" ")}
+                    >
+                      {s.start_time.slice(0, 5)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end mt-8">
             <button
               disabled={!slot}
-              onClick={() => { setStep(3); setConfirmOpen(true); }}
+              onClick={() => { setConfirmOpen(true); }}
               className="inline-flex items-center gap-2 rounded-full bg-brand text-brand-foreground px-6 py-2.5 text-sm font-semibold disabled:opacity-50 shadow-lg shadow-brand/25"
             >
               Continue to confirm <ChevronRight className="size-4" />
@@ -213,6 +301,9 @@ function Book() {
             {days[day].toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })} at {slot}.
           </p>
           <div className="mt-8 flex justify-center gap-3">
+            <Link to="/patient/appointments" className="px-5 py-2.5 rounded-full bg-brand text-brand-foreground text-sm font-semibold">
+              View my appointments
+            </Link>
             <button onClick={() => { setStep(1); setSlot(null); setPicked(null); }} className="px-5 py-2.5 rounded-full border border-border text-sm font-semibold">
               Book another
             </button>
@@ -225,21 +316,23 @@ function Book() {
           <DialogHeader>
             <DialogTitle>Confirm your appointment</DialogTitle>
             <DialogDescription>
-              {picked?.name} • {picked?.spec} on {days[day].toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })} at {slot}
+              {picked?.name} • {picked?.specialty} on {days[day].toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" })} at {slot}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-xl bg-muted p-4 text-sm space-y-2">
-            <div className="flex justify-between"><span className="text-muted-foreground">Visit fee</span><span className="font-semibold">{picked?.price}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Booking fee</span><span className="font-semibold">$0.00</span></div>
-            <div className="border-t border-border pt-2 flex justify-between font-bold"><span>Total</span><span>{picked?.price}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Consultation fee</span><span className="font-semibold">${picked?.consultation_fee}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Platform fee</span><span className="font-semibold">$0.00</span></div>
+            <div className="border-t border-border pt-2 flex justify-between font-bold"><span>Total to pay</span><span>${picked?.consultation_fee}</span></div>
           </div>
           <DialogFooter>
             <button onClick={() => setConfirmOpen(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground">Cancel</button>
             <button
-              onClick={() => { setConfirmOpen(false); toast.success("Appointment booked", { description: `${picked?.name} • ${slot}` }); }}
-              className="px-4 py-2 rounded-xl bg-brand text-brand-foreground text-sm font-semibold"
+              onClick={handleConfirm}
+              disabled={booking}
+              className="px-4 py-2 rounded-xl bg-brand text-brand-foreground text-sm font-semibold flex items-center gap-2"
             >
-              Confirm booking
+              {booking && <Loader2 className="size-4 animate-spin" />}
+              {booking ? "Processing..." : "Confirm booking"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -247,3 +340,5 @@ function Book() {
     </div>
   );
 }
+
+
