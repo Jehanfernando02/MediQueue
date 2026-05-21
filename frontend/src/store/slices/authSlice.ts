@@ -19,7 +19,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 export type Role = "patient" | "doctor" | "admin";
 
 export interface AuthUser {
-  id: number;
+  id: string;
   email: string;
   name: string;
   role: Role;
