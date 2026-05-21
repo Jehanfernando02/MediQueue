@@ -20,7 +20,7 @@ import { logoutThunk } from "@/thunks/authThunks";
 export type { Role };
 
 export interface AuthUser {
-  id?: number;
+  id?: string;
   name: string;
   email: string;
   role: Role;
