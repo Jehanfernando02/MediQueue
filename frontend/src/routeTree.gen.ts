@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PatientRouteImport } from './routes/patient'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DoctorRouteImport } from './routes/doctor'
@@ -33,6 +34,11 @@ import { Route as AdminAppointmentsRouteImport } from './routes/admin.appointmen
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PatientRoute = PatientRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/doctor': typeof DoctorRouteWithChildren
   '/login': typeof LoginRoute
   '/patient': typeof PatientRouteWithChildren
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/admin/appointments': typeof AdminAppointmentsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/admin/appointments': typeof AdminAppointmentsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/doctor': typeof DoctorRouteWithChildren
   '/login': typeof LoginRoute
   '/patient': typeof PatientRouteWithChildren
+  '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/admin/appointments': typeof AdminAppointmentsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/doctor'
     | '/login'
     | '/patient'
+    | '/profile'
     | '/register'
     | '/admin/appointments'
     | '/admin/audit'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/profile'
     | '/register'
     | '/admin/appointments'
     | '/admin/audit'
@@ -244,6 +255,7 @@ export interface FileRouteTypes {
     | '/doctor'
     | '/login'
     | '/patient'
+    | '/profile'
     | '/register'
     | '/admin/appointments'
     | '/admin/audit'
@@ -267,6 +279,7 @@ export interface RootRouteChildren {
   DoctorRoute: typeof DoctorRouteWithChildren
   LoginRoute: typeof LoginRoute
   PatientRoute: typeof PatientRouteWithChildren
+  ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
 }
 
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patient': {
@@ -475,6 +495,7 @@ const rootRouteChildren: RootRouteChildren = {
   DoctorRoute: DoctorRouteWithChildren,
   LoginRoute: LoginRoute,
   PatientRoute: PatientRouteWithChildren,
+  ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
