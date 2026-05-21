@@ -67,7 +67,7 @@ function extractError(err: unknown): string {
 
 // ── User mapper ───────────────────────────────────────────────────────────────
 
-function mapUser(u: { id: number; email: string; name: string; role: string }): AuthUser {
+function mapUser(u: { id: string; email: string; name: string; role: string }): AuthUser {
   return { id: u.id, email: u.email, name: u.name, role: u.role as Role };
 }
 
@@ -221,3 +221,60 @@ export const restoreSessionThunk =
       dispatch(clearAuth());
     }
   };
+
+
+/**
+ * Update user profile information (name)
+ */
+export const updateProfileThunk =
+  (payload: { name: string }) =>
+  async (dispatch: AppDispatch, getState: () => RootState): Promise<{ success: boolean; error?: string }> => {
+    dispatch(setAuthLoading());
+    try {
+      await api.patch("/auth/me", payload);
+      
+      const { data: meData } = await api.get("/auth/me");
+      const authUser = mapUser(meData.data);
+      const token = getState().auth.accessToken;
+      
+      if (token) {
+        dispatch(setAuthSuccess({ user: authUser, accessToken: token }));
+      }
+      
+      return { success: true };
+    } catch (err) {
+      const message = extractError(err);
+      dispatch(setAuthError(message));
+      return { success: false, error: message };
+    }
+  };
+
+
+/**
+ * Fast bypass login for Interactive Demo Showcase Mode
+ */
+export const demoLoginThunk =
+  (role: string) =>
+  async (dispatch: AppDispatch): Promise<AuthThunkResult> => {
+    dispatch(setAuthLoading());
+    try {
+      const { data } = await axios.post(
+        `${API_BASE}/api/v1/demo/login?role=${role}`,
+        {},
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      const { access_token, refresh_token, user } = data.data;
+      const authUser = mapUser(user);
+
+      saveRefreshToken(refresh_token);
+      dispatch(setAuthSuccess({ user: authUser, accessToken: access_token }));
+
+      return { success: true, user: authUser };
+    } catch (err) {
+      const message = extractError(err);
+      dispatch(setAuthError(message));
+      return { success: false, error: message };
+    }
+  };
+
