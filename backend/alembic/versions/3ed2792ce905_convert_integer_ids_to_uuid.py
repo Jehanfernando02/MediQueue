@@ -24,6 +24,20 @@ def upgrade() -> None:
     # This migration handles the case where the production database was created with INTEGER IDs
     # but the models now use UUID. Since this is a new deployment, we can safely drop and recreate tables.
     
+    # Drop ENUM types first (they need to be dropped before tables)
+    try:
+        op.execute('DROP TYPE IF EXISTS userrole')
+    except:
+        pass
+    try:
+        op.execute('DROP TYPE IF EXISTS doctorstatus')
+    except:
+        pass
+    try:
+        op.execute('DROP TYPE IF EXISTS appointmentstatus')
+    except:
+        pass
+    
     # Drop tables in reverse order of creation (to handle foreign keys)
     # Use IF EXISTS to handle case where tables might not exist
     try:
