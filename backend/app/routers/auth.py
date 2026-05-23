@@ -26,7 +26,7 @@ async def register(
     request: Request,
     body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis: aioredis.Redis | None = Depends(get_redis),
 ):
     tokens = await auth_service.register(db, body)
 
@@ -68,7 +68,7 @@ async def login(
     request: Request,
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis: aioredis.Redis | None = Depends(get_redis),
 ):
     tokens = await auth_service.login(db, redis, body)
 
@@ -119,7 +119,7 @@ async def login(
 async def refresh(
     body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis: aioredis.Redis | None = Depends(get_redis),
 ):
     tokens = await auth_service.refresh(db, redis, body.refresh_token)
     return success_response(
@@ -137,7 +137,7 @@ async def logout(
     request: Request,
     body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis: aioredis.Redis | None = Depends(get_redis),
     current_user: User = Depends(get_current_user),
 ):
     # Resolve name for logging

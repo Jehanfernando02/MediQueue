@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 import uuid
+import logging
 from datetime import timedelta, datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,8 @@ from app.utils.hashing import hash_password, verify_password
 from app.utils.jwt import create_access_token, create_refresh_token, decode_token
 from app.utils.exceptions import UnauthorizedError, ConflictError, NotFoundError
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +86,7 @@ class AuthService:
     async def login(
         self,
         db: AsyncSession,
-        redis: aioredis.Redis,
+        redis: aioredis.Redis | None,
         data: LoginRequest,
     ) -> TokenResponse:
         result = await db.execute(select(User).where(User.email == data.email))
@@ -97,13 +100,17 @@ class AuthService:
 
         tokens = await self._issue_tokens(user)
 
-        # Store refresh token in Redis (single-use, TTL = 7 days)
-        token_hash = _hash_token(tokens.refresh_token)
-        await redis.setex(
-            _refresh_key(token_hash),
-            timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-            str(user.id),
-        )
+        # Store refresh token in Redis (single-use, TTL = 7 days) if available
+        if redis:
+            try:
+                token_hash = _hash_token(tokens.refresh_token)
+                await redis.setex(
+                    _refresh_key(token_hash),
+                    timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+                    str(user.id),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to store refresh token in Redis: {e}")
 
         return tokens
 
@@ -113,7 +120,7 @@ class AuthService:
     async def refresh(
         self,
         db: AsyncSession,
-        redis: aioredis.Redis,
+        redis: aioredis.Redis | None,
         refresh_token: str,
     ) -> TokenResponse:
         # Validate JWT structure
@@ -125,19 +132,25 @@ class AuthService:
         if payload.get("type") != "refresh":
             raise UnauthorizedError("Token type mismatch.")
 
-        # Check Redis — single-use enforcement
-        token_hash = _hash_token(refresh_token)
-        redis_key = _refresh_key(token_hash)
-        stored_user_id = await redis.get(redis_key)
+        # Check Redis — single-use enforcement (if available)
+        user_id = uuid.UUID(payload["sub"])
+        
+        if redis:
+            try:
+                token_hash = _hash_token(refresh_token)
+                redis_key = _refresh_key(token_hash)
+                stored_user_id = await redis.get(redis_key)
 
-        if not stored_user_id:
-            raise UnauthorizedError("Refresh token has been revoked or already used.")
+                if not stored_user_id:
+                    raise UnauthorizedError("Refresh token has been revoked or already used.")
 
-        # DELETE old token immediately (rotation)
-        await redis.delete(redis_key)
+                # DELETE old token immediately (rotation)
+                await redis.delete(redis_key)
+            except Exception as e:
+                logger.warning(f"Redis error during refresh: {e}. Falling back to JWT-only validation.")
 
         # Fetch user
-        result = await db.execute(select(User).where(User.id == uuid.UUID(stored_user_id)))
+        result = await db.execute(select(User).where(User.id == user_id))
         user: User | None = result.scalar_one_or_none()
         if not user or not user.is_active:
             raise UnauthorizedError("User not found or inactive.")
@@ -145,13 +158,17 @@ class AuthService:
         # Issue new token pair
         new_tokens = await self._issue_tokens(user)
 
-        # Store new refresh token
-        new_hash = _hash_token(new_tokens.refresh_token)
-        await redis.setex(
-            _refresh_key(new_hash),
-            timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-            str(user.id),
-        )
+        # Store new refresh token in Redis if available
+        if redis:
+            try:
+                new_hash = _hash_token(new_tokens.refresh_token)
+                await redis.setex(
+                    _refresh_key(new_hash),
+                    timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+                    str(user.id),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to store new refresh token in Redis: {e}")
 
         return new_tokens
 
@@ -160,11 +177,16 @@ class AuthService:
     # -----------------------------------------------------------------------
     async def logout(
         self,
-        redis: aioredis.Redis,
+        redis: aioredis.Redis | None,
         refresh_token: str,
     ) -> None:
-        token_hash = _hash_token(refresh_token)
-        await redis.delete(_refresh_key(token_hash))
+        if redis:
+            try:
+                token_hash = _hash_token(refresh_token)
+                await redis.delete(_refresh_key(token_hash))
+            except Exception as e:
+                logger.warning(f"Failed to delete refresh token from Redis: {e}")
+        # If Redis is not available, logout still succeeds (token will expire naturally)
 
     # -----------------------------------------------------------------------
     # Get current user from access token
