@@ -25,57 +25,21 @@ def upgrade() -> None:
     # but the models now use UUID. Since this is a new deployment, we can safely drop and recreate tables.
     
     # Drop ENUM types first (they need to be dropped before tables)
-    try:
-        op.execute('DROP TYPE IF EXISTS userrole')
-    except:
-        pass
-    try:
-        op.execute('DROP TYPE IF EXISTS doctorstatus')
-    except:
-        pass
-    try:
-        op.execute('DROP TYPE IF EXISTS appointmentstatus')
-    except:
-        pass
+    op.execute('DROP TYPE IF EXISTS userrole CASCADE')
+    op.execute('DROP TYPE IF EXISTS doctorstatus CASCADE')
+    op.execute('DROP TYPE IF EXISTS appointmentstatus CASCADE')
     
     # Drop tables in reverse order of creation (to handle foreign keys)
     # Use IF EXISTS to handle case where tables might not exist
-    try:
-        op.drop_table('consultation_notes')
-    except:
-        pass
-    try:
-        op.drop_table('appointments')
-    except:
-        pass
-    try:
-        op.drop_table('time_slots')
-    except:
-        pass
-    try:
-        op.drop_table('patients')
-    except:
-        pass
-    try:
-        op.drop_table('notifications')
-    except:
-        pass
-    try:
-        op.drop_table('doctors')
-    except:
-        pass
-    try:
-        op.drop_table('audit_logs')
-    except:
-        pass
-    try:
-        op.drop_table('users')
-    except:
-        pass
-    try:
-        op.drop_table('departments')
-    except:
-        pass
+    op.execute('DROP TABLE IF EXISTS consultation_notes CASCADE')
+    op.execute('DROP TABLE IF EXISTS appointments CASCADE')
+    op.execute('DROP TABLE IF EXISTS time_slots CASCADE')
+    op.execute('DROP TABLE IF EXISTS patients CASCADE')
+    op.execute('DROP TABLE IF EXISTS notifications CASCADE')
+    op.execute('DROP TABLE IF EXISTS doctors CASCADE')
+    op.execute('DROP TABLE IF EXISTS audit_logs CASCADE')
+    op.execute('DROP TABLE IF EXISTS users CASCADE')
+    op.execute('DROP TABLE IF EXISTS departments CASCADE')
     
     # Recreate tables with UUID columns (same as f833decff7b8)
     op.create_table('departments',
