@@ -1,0 +1,233 @@
+"""convert_integer_ids_to_uuid
+
+Revision ID: 3ed2792ce905
+Revises: f833decff7b8
+Create Date: 2026-05-23 12:14:00.326943
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+
+# revision identifiers, used by Alembic.
+revision: str = '3ed2792ce905'
+down_revision: Union[str, Sequence[str], None] = 'f833decff7b8'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # This migration handles the case where the production database was created with INTEGER IDs
+    # but the models now use UUID. Since this is a new deployment, we can safely drop and recreate tables.
+    
+    # Drop tables in reverse order of creation (to handle foreign keys)
+    # Use IF EXISTS to handle case where tables might not exist
+    try:
+        op.drop_table('consultation_notes')
+    except:
+        pass
+    try:
+        op.drop_table('appointments')
+    except:
+        pass
+    try:
+        op.drop_table('time_slots')
+    except:
+        pass
+    try:
+        op.drop_table('patients')
+    except:
+        pass
+    try:
+        op.drop_table('notifications')
+    except:
+        pass
+    try:
+        op.drop_table('doctors')
+    except:
+        pass
+    try:
+        op.drop_table('audit_logs')
+    except:
+        pass
+    try:
+        op.drop_table('users')
+    except:
+        pass
+    try:
+        op.drop_table('departments')
+    except:
+        pass
+    
+    # Recreate tables with UUID columns (same as f833decff7b8)
+    op.create_table('departments',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('description', sa.String(length=500), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
+    )
+    op.create_index(op.f('ix_departments_id'), 'departments', ['id'], unique=False)
+    
+    op.create_table('users',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('email', sa.String(length=255), nullable=False),
+    sa.Column('password_hash', sa.String(length=255), nullable=False),
+    sa.Column('role', sa.Enum('patient', 'doctor', 'admin', name='userrole'), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+    
+    op.create_table('audit_logs',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=True),
+    sa.Column('action', sa.String(length=100), nullable=False),
+    sa.Column('entity', sa.String(length=100), nullable=False),
+    sa.Column('entity_id', sa.String(length=50), nullable=True),
+    sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('ip_address', sa.String(length=45), nullable=True),
+    sa.Column('request_id', sa.String(length=36), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_audit_logs_created_at'), 'audit_logs', ['created_at'], unique=False)
+    op.create_index(op.f('ix_audit_logs_id'), 'audit_logs', ['id'], unique=False)
+    op.create_index(op.f('ix_audit_logs_user_id'), 'audit_logs', ['user_id'], unique=False)
+    
+    op.create_table('doctors',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('department_id', sa.UUID(), nullable=True),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('specialty', sa.String(length=100), nullable=False),
+    sa.Column('status', sa.Enum('active', 'on_leave', 'inactive', name='doctorstatus'), nullable=False),
+    sa.Column('rating', sa.Float(), nullable=False),
+    sa.Column('review_count', sa.Integer(), nullable=False),
+    sa.Column('consultation_fee', sa.Float(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['department_id'], ['departments.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id')
+    )
+    op.create_index(op.f('ix_doctors_id'), 'doctors', ['id'], unique=False)
+    
+    op.create_table('notifications',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('type', sa.String(length=50), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=False),
+    sa.Column('body', sa.Text(), nullable=False),
+    sa.Column('is_read', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_notifications_id'), 'notifications', ['id'], unique=False)
+    op.create_index(op.f('ix_notifications_user_id'), 'notifications', ['user_id'], unique=False)
+    
+    op.create_table('patients',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('dob', sa.Date(), nullable=True),
+    sa.Column('blood_type', sa.String(length=10), nullable=True),
+    sa.Column('phone', sa.String(length=20), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id')
+    )
+    op.create_index(op.f('ix_patients_id'), 'patients', ['id'], unique=False)
+    
+    op.create_table('time_slots',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('doctor_id', sa.UUID(), nullable=False),
+    sa.Column('day_of_week', sa.Integer(), nullable=False),
+    sa.Column('start_time', sa.Time(), nullable=False),
+    sa.Column('end_time', sa.Time(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_time_slots_doctor_id'), 'time_slots', ['doctor_id'], unique=False)
+    op.create_index(op.f('ix_time_slots_id'), 'time_slots', ['id'], unique=False)
+    
+    op.create_table('appointments',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('patient_id', sa.UUID(), nullable=False),
+    sa.Column('doctor_id', sa.UUID(), nullable=False),
+    sa.Column('slot_id', sa.UUID(), nullable=True),
+    sa.Column('date', sa.Date(), nullable=False),
+    sa.Column('start_time', sa.Time(), nullable=False),
+    sa.Column('status', sa.Enum('scheduled', 'arrived', 'in_progress', 'done', 'cancelled', 'no_show', name='appointmentstatus'), nullable=False),
+    sa.Column('queue_number', sa.Integer(), nullable=True),
+    sa.Column('reason', sa.String(length=500), nullable=True),
+    sa.Column('notes_count', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['slot_id'], ['time_slots.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_appointments_doctor_date', 'appointments', ['doctor_id', 'date'], unique=False)
+    op.create_index(op.f('ix_appointments_id'), 'appointments', ['id'], unique=False)
+    op.create_index('ix_appointments_patient_id', 'appointments', ['patient_id'], unique=False)
+    op.create_index('ix_appointments_status_date', 'appointments', ['status', 'date'], unique=False)
+    
+    op.create_table('consultation_notes',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('appointment_id', sa.UUID(), nullable=False),
+    sa.Column('doctor_id', sa.UUID(), nullable=False),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['appointment_id'], ['appointments.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_consultation_notes_appointment_id'), 'consultation_notes', ['appointment_id'], unique=False)
+    op.create_index(op.f('ix_consultation_notes_id'), 'consultation_notes', ['id'], unique=False)
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # Drop tables in reverse order
+    op.drop_index(op.f('ix_consultation_notes_id'), table_name='consultation_notes')
+    op.drop_index(op.f('ix_consultation_notes_appointment_id'), table_name='consultation_notes')
+    op.drop_table('consultation_notes')
+    op.drop_index('ix_appointments_status_date', table_name='appointments')
+    op.drop_index('ix_appointments_patient_id', table_name='appointments')
+    op.drop_index(op.f('ix_appointments_id'), table_name='appointments')
+    op.drop_index('ix_appointments_doctor_date', table_name='appointments')
+    op.drop_table('appointments')
+    op.drop_index(op.f('ix_time_slots_id'), table_name='time_slots')
+    op.drop_index(op.f('ix_time_slots_doctor_id'), table_name='time_slots')
+    op.drop_table('time_slots')
+    op.drop_index(op.f('ix_patients_id'), table_name='patients')
+    op.drop_table('patients')
+    op.drop_index(op.f('ix_notifications_user_id'), table_name='notifications')
+    op.drop_index(op.f('ix_notifications_id'), table_name='notifications')
+    op.drop_table('notifications')
+    op.drop_index(op.f('ix_doctors_id'), table_name='doctors')
+    op.drop_table('doctors')
+    op.drop_index(op.f('ix_audit_logs_user_id'), table_name='audit_logs')
+    op.drop_index(op.f('ix_audit_logs_id'), table_name='audit_logs')
+    op.drop_index(op.f('ix_audit_logs_created_at'), table_name='audit_logs')
+    op.drop_table('audit_logs')
+    op.drop_index(op.f('ix_users_id'), table_name='users')
+    op.drop_index(op.f('ix_users_email'), table_name='users')
+    op.drop_table('users')
+    op.drop_index(op.f('ix_departments_id'), table_name='departments')
+    op.drop_table('departments')
