@@ -222,7 +222,7 @@ async def get_doctor_patients(
 @router.get("/{doctor_id}/slots", summary="Get available slots for a doctor")
 async def get_doctor_slots(
     doctor_id: str,
-    date_str: str = Query(..., alias="date", pattern="^\d{4}-\d{2}-\d{2}$"),
+    date_str: str = Query(..., alias="date", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

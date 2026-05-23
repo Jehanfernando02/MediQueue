@@ -36,79 +36,57 @@ def upgrade() -> None:
         return  # Skip if already seeded
 
     # Insert departments
-    cardiology_id = uuid.uuid4()
-    neurology_id = uuid.uuid4()
-    orthopedics_id = uuid.uuid4()
-    pediatrics_id = uuid.uuid4()
-    dermatology_id = uuid.uuid4()
+    cardiology_id = str(uuid.uuid4())
+    neurology_id = str(uuid.uuid4())
+    orthopedics_id = str(uuid.uuid4())
+    pediatrics_id = str(uuid.uuid4())
+    dermatology_id = str(uuid.uuid4())
 
     op.execute(
-        sa.text("""
+        f"""
             INSERT INTO departments (id, name, description, created_at)
             VALUES
-                (:cardiology_id, 'Cardiology', 'Heart and cardiovascular system specialists', NOW()),
-                (:neurology_id, 'Neurology', 'Brain and nervous system specialists', NOW()),
-                (:orthopedics_id, 'Orthopedics', 'Musculoskeletal system specialists', NOW()),
-                (:pediatrics_id, 'Pediatrics', 'Child healthcare specialists', NOW()),
-                (:dermatology_id, 'Dermatology', 'Skin and hair specialists', NOW())
-        """),
-        {
-            "cardiology_id": cardiology_id,
-            "neurology_id": neurology_id,
-            "orthopedics_id": orthopedics_id,
-            "pediatrics_id": pediatrics_id,
-            "dermatology_id": dermatology_id,
-        }
+                ('{cardiology_id}', 'Cardiology', 'Heart and cardiovascular system specialists', NOW()),
+                ('{neurology_id}', 'Neurology', 'Brain and nervous system specialists', NOW()),
+                ('{orthopedics_id}', 'Orthopedics', 'Musculoskeletal system specialists', NOW()),
+                ('{pediatrics_id}', 'Pediatrics', 'Child healthcare specialists', NOW()),
+                ('{dermatology_id}', 'Dermatology', 'Skin and hair specialists', NOW())
+        """
     )
 
     # Insert users
-    admin_id = uuid.uuid4()
-    doctor_id = uuid.uuid4()
-    patient_id = uuid.uuid4()
+    admin_id = str(uuid.uuid4())
+    doctor_id = str(uuid.uuid4())
+    patient_id = str(uuid.uuid4())
 
     op.execute(
-        sa.text("""
+        f"""
             INSERT INTO users (id, email, password_hash, role, is_active, created_at, updated_at)
             VALUES
-                (:admin_id, 'admin@demo.mediqueue.org', :admin_password, 'admin', true, NOW(), NOW()),
-                (:doctor_id, 'doctor@demo.mediqueue.org', :doctor_password, 'doctor', true, NOW(), NOW()),
-                (:patient_id, 'patient@demo.mediqueue.org', :patient_password, 'patient', true, NOW(), NOW())
-        """),
-        {
-            "admin_id": admin_id,
-            "doctor_id": doctor_id,
-            "patient_id": patient_id,
-            "admin_password": hash_password("admin123"),
-            "doctor_password": hash_password("doctor123"),
-            "patient_password": hash_password("patient123"),
-        }
+                ('{admin_id}', 'admin@demo.mediqueue.org', '{hash_password("admin123")}', 'admin', true, NOW(), NOW()),
+                ('{doctor_id}', 'doctor@demo.mediqueue.org', '{hash_password("doctor123")}', 'doctor', true, NOW(), NOW()),
+                ('{patient_id}', 'patient@demo.mediqueue.org', '{hash_password("patient123")}', 'patient', true, NOW(), NOW())
+        """
     )
 
     # Insert doctor profile
+    doctor_profile_id = str(uuid.uuid4())
     op.execute(
-        sa.text("""
+        f"""
             INSERT INTO doctors (id, user_id, department_id, name, specialty, status, rating, review_count, consultation_fee, created_at)
             VALUES
-                (:doctor_profile_id, :doctor_id, :cardiology_id, 'Dr. Sarah Johnson', 'Cardiologist', 'active', 4.8, 120, 150.0, NOW())
-        """),
-        {
-            "doctor_profile_id": uuid.uuid4(),
-            "doctor_id": doctor_id,
-            "cardiology_id": cardiology_id,
-        }
+                ('{doctor_profile_id}', '{doctor_id}', '{cardiology_id}', 'Dr. Sarah Johnson', 'Cardiologist', 'active', 4.8, 120, 150.0, NOW())
+        """
     )
 
     # Insert patient profile
+    patient_profile_id = str(uuid.uuid4())
     op.execute(
-        sa.text("""
+        f"""
             INSERT INTO patients (id, user_id, name, dob, blood_type, phone, created_at)
             VALUES
-                (:patient_profile_id, :patient_id, 'John Doe', '1990-05-15', 'O+', '+1234567890', NOW())
-        """),
-        {
-            "patient_profile_id": uuid.uuid4(),
-            "patient_id": patient_id,
-        }
+                ('{patient_profile_id}', '{patient_id}', 'John Doe', '1990-05-15', 'O+', '+1234567890', NOW())
+        """
     )
 
 
