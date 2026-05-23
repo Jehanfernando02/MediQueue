@@ -66,7 +66,7 @@ async def demo_login(
     request: Request,
     role: str = Query(..., description="Role to login as: patient, doctor, or admin"),
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis: aioredis.Redis | None = Depends(get_redis),
 ):
     """
     Simulates a secure login for guests to quickly enter different dashboards
@@ -93,24 +93,39 @@ async def demo_login(
     user = result.scalar_one_or_none()
     
     if not user:
-        # Demo user not found — return error instead of auto-seeding
-        # (Auto-seeding disabled due to schema mismatch: models use UUID but migration uses INTEGER)
-        logger.warning("Demo user %s not found. Please seed database manually or create demo user.", email)
-        raise HTTPException(
-            status_code=404,
-            detail=f"Demo user with email '{email}' not found. Database may not be seeded."
-        )
+        # Demo user not found — auto-seed the database
+        logger.warning("Demo user %s not found. Auto-seeding database...", email)
+        try:
+            await demo_service.seed_sandbox_data(db)
+            # Try fetching the user again after seeding
+            result = await db.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            if not user:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to create demo user after seeding."
+                )
+        except Exception as e:
+            logger.exception("Failed to auto-seed database")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to seed database: {str(e)}"
+            )
         
     # Standard issue of JWT tokens (access + refresh)
     tokens = await auth_service._issue_tokens(user)
     
-    # Store refresh token in Redis (single-use, TTL = 7 days)
-    token_hash = _hash_token(tokens.refresh_token)
-    await redis.setex(
-        _refresh_key(token_hash),
-        timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-        str(user.id),
-    )
+    # Store refresh token in Redis (single-use, TTL = 7 days) if available
+    if redis:
+        try:
+            token_hash = _hash_token(tokens.refresh_token)
+            await redis.setex(
+                _refresh_key(token_hash),
+                timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+                str(user.id),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to store refresh token in Redis: {e}")
     
     # Resolve display name from profile table
     name = ""
