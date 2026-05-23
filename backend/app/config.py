@@ -4,7 +4,12 @@ import os
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env.dev", env_file_encoding="utf-8")
+    # In production, don't use env_file - rely on actual environment variables
+    # In development, use .env.dev if it exists
+    model_config = SettingsConfigDict(
+        env_file=".env.dev" if os.path.exists(".env.dev") else None,
+        env_file_encoding="utf-8"
+    )
 
     # App
     APP_NAME: str = "MediQueue"
