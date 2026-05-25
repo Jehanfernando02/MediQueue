@@ -8,7 +8,14 @@ import "./styles.css";
 import { routeTree } from "./routeTree.gen";
 
 // Create query client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Create router
 const router = createRouter({
@@ -16,6 +23,7 @@ const router = createRouter({
   context: { queryClient },
   scrollRestoration: true,
   defaultPreloadStaleTime: 0,
+  defaultPreload: "intent",
 });
 
 // Register router for TypeScript
