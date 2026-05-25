@@ -14,8 +14,11 @@ import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { store } from "@/store/store";
 import { restoreSessionThunk } from "@/thunks/authThunks";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useAppDispatch } from "@/store/hooks";
 
+// ---------------------------------------------------------------------------
+// 404
+// ---------------------------------------------------------------------------
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center soft-gradient px-4">
@@ -38,6 +41,9 @@ function NotFoundComponent() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Error boundary
+// ---------------------------------------------------------------------------
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   return (
@@ -64,6 +70,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Route definition
+// ---------------------------------------------------------------------------
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -99,6 +108,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+// ---------------------------------------------------------------------------
+// Shell (SSR HTML wrapper)
+// ---------------------------------------------------------------------------
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -113,58 +125,46 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * AppGate — blocks rendering the app until session restoration is complete.
- *
- * On page refresh, Redux is cleared (in-memory). Without this gate,
- * AppShell would see `user = null` and immediately redirect to /login
- * before the async restoreSessionThunk() finishes.
- *
- * The gate:
- *  - If no refresh token exists → resolves instantly (no spinner flash)
- *  - If a token exists → waits for the restore promise to settle
- */
+// ---------------------------------------------------------------------------
+// AppGate — blocks rendering until session restoration is complete.
+//
+// On page refresh Redux is cleared (in-memory). Without this gate,
+// route guards would see `user = null` and redirect to /login before
+// restoreSessionThunk() has a chance to rehydrate the auth state.
+//
+// Rules:
+//  • Runs ONCE on mount (empty dep array) — never re-runs on navigation.
+//  • Auth pages (/login, /register) skip restoration and go straight to ready.
+//  • No refresh token → skip straight to ready (no spinner flash).
+//  • Token present → wait for restore to settle (max 5 s timeout).
+// ---------------------------------------------------------------------------
 function AppGate({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
   const [ready, setReady] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Only run once on mount, not on every route change
   useEffect(() => {
-    if (hasInitialized) return;
-    setHasInitialized(true);
+    const currentPath = window.location.pathname;
+    const isAuthPage = currentPath === "/login" || currentPath === "/register";
+    const hasToken = !!localStorage.getItem("mediqueue.refresh_token");
 
-    const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
-
-    // Skip session restoration on login/register pages - no need to restore session there
-    if (currentPath === "/login" || currentPath === "/register") {
-      setReady(true);
-      return;
-    }
-
-    const isWindow = typeof window !== "undefined";
-    const hasToken = isWindow && !!localStorage.getItem("mediqueue.refresh_token");
-    if (!hasToken) {
-      // No token to restore — skip straight to ready
+    // Nothing to restore — go straight to ready
+    if (isAuthPage || !hasToken) {
       setReady(true);
       return;
     }
 
     // Attempt session restore; mark ready when settled (success or failure)
-    // Add a timeout to prevent hanging if API is unavailable
-    const timeout = setTimeout(() => {
-      setReady(true);
-    }, 5000); // 5 second timeout
+    const timeout = setTimeout(() => setReady(true), 5000);
 
     (dispatch(restoreSessionThunk()) as unknown as Promise<void>)
       .catch(() => {
-        // Ignore errors, just mark as ready
+        // Silently ignore — the user will just land on /login
       })
       .finally(() => {
         clearTimeout(timeout);
         setReady(true);
       });
-  }, [hasInitialized, dispatch]);
+  }, []); // ← empty: runs once on mount only, not on every navigation
 
   if (!ready) {
     return (
@@ -180,6 +180,9 @@ function AppGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ---------------------------------------------------------------------------
+// Root component
+// ---------------------------------------------------------------------------
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
