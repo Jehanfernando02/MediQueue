@@ -122,9 +122,18 @@ function RootShell({ children }: { children: React.ReactNode }) {
  */
 function AppGate({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    const currentPath = router.state.location.pathname;
+    
+    // Skip session restoration on login/register pages - no need to restore session there
+    if (currentPath === "/login" || currentPath === "/register") {
+      setReady(true);
+      return;
+    }
+
     const hasToken =
       typeof window !== "undefined" &&
       !!localStorage.getItem("mediqueue.refresh_token");
@@ -150,7 +159,7 @@ function AppGate({ children }: { children: React.ReactNode }) {
         setReady(true);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router.state.location.pathname]);
 
   if (!ready) {
     return (
