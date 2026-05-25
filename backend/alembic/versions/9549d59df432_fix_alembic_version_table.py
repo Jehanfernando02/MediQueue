@@ -20,8 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema - fix alembic_version table."""
-    # Update alembic_version to point to the latest valid revision
-    op.execute("UPDATE alembic_version SET version_num = '3bf8d83c79c2' WHERE version_num = '02a170dc410f'")
+    # Set alembic_version to this revision regardless of current state
+    op.execute("DELETE FROM alembic_version")
+    op.execute("INSERT INTO alembic_version (version_num) VALUES ('9549d59df432')")
 
 
 def downgrade() -> None:
