@@ -29,7 +29,7 @@ const api = axios.create({
   timeout: 15_000,
 });
 
-// ── Request interceptor: inject access token and block demo mutations ────────
+// ── Request interceptor: inject access token ─────────────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = store.getState().auth.accessToken;
   if (token && config.headers) {

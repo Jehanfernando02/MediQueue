@@ -97,7 +97,7 @@ function ProfilePage() {
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground ml-1">
-                    Email cannot be changed in this demo.
+                    Email cannot be changed.
                   </p>
                 </div>
               </div>

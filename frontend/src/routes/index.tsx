@@ -17,25 +17,13 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [demoCompleted, setDemoCompleted] = useState(false);
 
   useEffect(() => {
     if (user) navigate({ to: homeForRole(user.role) });
   }, [user, navigate]);
 
-  useEffect(() => {
-    const isCompleted = localStorage.getItem("mediqueue.demo_completed") === "true";
-    setDemoCompleted(isCompleted);
-  }, []);
-
   return (
     <div className="min-h-screen bg-background dot-grid selection:bg-brand/30 overflow-hidden">
-      {/* System Showcase Banner */}
-      {!demoCompleted && (
-        <div className="bg-slate-950 border-b border-white/10 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white relative z-50">
-          🚀 <span className="text-brand">Interactive System Showcase:</span> One-click showcase mode is active. Click <a href="/login?demo=true" onClick={(e) => { e.preventDefault(); sessionStorage.setItem("mediqueue.showcase_active", "true"); localStorage.removeItem("mediqueue.demo_completed"); window.location.href = "/login?demo=true"; }} className="underline text-clinical hover:text-brand transition-colors">Explore Demo</a> to bypass forms and view all 3 dashboards.
-        </div>
-      )}
 
       {/* Decorative Orbs */}
       <div className="absolute top-[-10%] left-[-10%] size-[500px] bg-brand/10 blur-[120px] rounded-full animate-pulse" />
@@ -89,13 +77,12 @@ function Landing() {
             >
               Start Free Trial <MoveRight className="size-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <a
-              href="/login?demo=true"
-              onClick={(e) => { e.preventDefault(); sessionStorage.setItem("mediqueue.showcase_active", "true"); localStorage.removeItem("mediqueue.demo_completed"); window.location.href = "/login?demo=true"; }}
+            <Link
+              to="/login"
               className="inline-flex items-center gap-3 rounded-2xl border border-border bg-card/40 backdrop-blur-md px-8 py-4 text-xs font-black uppercase tracking-widest hover:bg-muted transition-all shadow-sm"
             >
-              Explore Demo
-            </a>
+              Sign In
+            </Link>
           </div>
           <div className="mt-16 flex items-center gap-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
             <div className="flex items-center gap-2"><Activity className="size-4 text-clinical" /> REAL-TIME QUEUE</div>

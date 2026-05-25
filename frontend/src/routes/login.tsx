@@ -11,15 +11,10 @@ import {
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectAuthStatus, selectAuthError, clearError } from "@/store/slices/authSlice";
-import { loginThunk, demoLoginThunk } from "@/thunks/authThunks";
+import { loginThunk } from "@/thunks/authThunks";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): { demo?: boolean } => {
-    return {
-      demo: (search.demo === "true" || search.demo === true) ? true : undefined,
-    };
-  },
   head: () => ({ meta: [{ title: "Sign in — MediQueue" }] }),
   component: Login,
 });
@@ -48,18 +43,8 @@ function Login() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const { demo: routerDemoMode } = Route.useSearch();
-  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const loading = status === "loading";
-
-  useEffect(() => {
-    const hasDemoParam = typeof window !== "undefined" && window.location.search.includes("demo=true");
-    const isShowcaseActive = typeof window !== "undefined" && sessionStorage.getItem("mediqueue.showcase_active") === "true";
-    const isCompleted = typeof window !== "undefined" && localStorage.getItem("mediqueue.demo_completed") === "true";
-    
-    setIsDemoMode((!!routerDemoMode || hasDemoParam || isShowcaseActive) && !isCompleted);
-  }, [routerDemoMode]);
 
   useEffect(() => {
     if (apiError) dispatch(clearError());
@@ -79,27 +64,8 @@ function Login() {
     toast.success("Reset link sent", { description: "If that email exists, check your inbox." });
   };
 
-  const handleDemoLogin = async (demoRole: string) => {
-    const result = await dispatch(demoLoginThunk(demoRole));
-    if (result.success) {
-      toast.success("Welcome back", { description: `Signed in as demo ${result.user.role}` });
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("mediqueue.demo_welcome_triggered", "true");
-      }
-      navigate({ to: homeForRole(result.user.role) });
-    } else {
-      toast.error("Failed to enter demo mode", { description: result.error });
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col overflow-hidden selection:bg-brand/30">
-      {/* System Showcase Banner */}
-      {isDemoMode && (
-        <div className="bg-slate-950 border-b border-white/10 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white relative z-50 shrink-0">
-          🚀 <span className="text-brand">Interactive System Showcase:</span> Use the quick-launch buttons inside the card to instantly bypass forms.
-        </div>
-      )}
       <div className="grid lg:grid-cols-2 flex-1 relative min-h-0">
         {/* Left panel - Premium Mesh Hero */}
         <div className="hidden lg:flex relative flex-col justify-between p-16 mesh-gradient noise-overlay text-white">
@@ -195,61 +161,6 @@ function Login() {
                 );
               })}
             </div>
-
-            {/* Interactive Showcase Panel */}
-            {isDemoMode && (
-              <div className="mb-8 p-4 rounded-2xl bg-brand/5 border border-brand/20 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
-                  <Sparkles className="size-6 text-brand" />
-                </div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-brand mb-1 flex items-center gap-1.5">
-                  🚀 Interactive Showcase Guide
-                </h3>
-                <p className="text-[10px] font-semibold text-muted-foreground mb-3.5 leading-relaxed">
-                  MediQueue is a hospital-grade Clinical OS. Click a role below to bypass sign-in and explore the dashboards in read-only Showcase Mode.
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin("patient")}
-                    className="py-2.5 rounded-xl bg-brand text-brand-foreground text-[9px] font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.97] transition-all text-center shadow-lg shadow-brand/10 hover:shadow-brand/25 cursor-pointer"
-                  >
-                    Patient
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin("doctor")}
-                    className="py-2.5 rounded-xl bg-clinical text-white text-[9px] font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.97] transition-all text-center shadow-lg shadow-clinical/10 hover:shadow-clinical/25 cursor-pointer"
-                  >
-                    Doctor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDemoLogin("admin")}
-                    className="py-2.5 rounded-xl bg-slate-900 dark:bg-slate-950 text-slate-100 text-[9px] font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.97] transition-all text-center border border-slate-800 shadow-lg cursor-pointer"
-                  >
-                    Admin
-                  </button>
-                </div>
-                
-                <div className="mt-3.5 pt-3 border-t border-brand/10 flex justify-between items-center gap-4">
-                  <span className="text-[8px] font-medium text-muted-foreground leading-none">Done exploring the clinical OS?</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.setItem("mediqueue.demo_completed", "true");
-                      sessionStorage.removeItem("mediqueue.showcase_active");
-                      setIsDemoMode(false);
-                      toast.success("Showcase completed!", { description: "Welcome back to the clean Clinical OS." });
-                    }}
-                    className="py-2 px-4 rounded-xl bg-gradient-to-r from-brand to-clinical text-brand-foreground text-[9px] font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.97] transition-all text-center flex items-center justify-center gap-1.5 shadow-md shadow-brand/10 hover:shadow-brand/20 shimmer-sweep cursor-pointer font-black"
-                  >
-                    <Sparkles className="size-3" />
-                    Finish Exploring
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Error banner */}
             {apiError && (
