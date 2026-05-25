@@ -3,7 +3,6 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
-  useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -41,7 +40,6 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
-  const router = useRouter();
   return (
     <div className="flex min-h-screen items-center justify-center soft-gradient px-4">
       <div className="max-w-md text-center">
@@ -49,12 +47,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={reset}
             className="rounded-full bg-brand text-brand-foreground px-5 py-2.5 text-sm font-semibold"
           >
             Try again
           </button>
-          <a href="/" className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold">
+          <a
+            href="/"
+            className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold"
+          >
             Go home
           </a>
         </div>
@@ -75,7 +76,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "MediQueue is a hospital-grade SaaS for appointments, live patient queues and clinic operations.",
       },
       { property: "og:title", content: "MediQueue — Clinical Appointment & Patient Flow" },
-      { property: "og:description", content: "Hospital-grade SaaS for appointments and patient flow." },
+      {
+        property: "og:description",
+        content: "Hospital-grade SaaS for appointments and patient flow.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -122,22 +126,24 @@ function RootShell({ children }: { children: React.ReactNode }) {
  */
 function AppGate({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
-  const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
+  // Only run once on mount, not on every route change
   useEffect(() => {
-    const currentPath = router.state.location.pathname;
-    
+    if (hasInitialized) return;
+    setHasInitialized(true);
+
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
+
     // Skip session restoration on login/register pages - no need to restore session there
     if (currentPath === "/login" || currentPath === "/register") {
       setReady(true);
       return;
     }
 
-    const hasToken =
-      typeof window !== "undefined" &&
-      !!localStorage.getItem("mediqueue.refresh_token");
-
+    const isWindow = typeof window !== "undefined";
+    const hasToken = isWindow && !!localStorage.getItem("mediqueue.refresh_token");
     if (!hasToken) {
       // No token to restore — skip straight to ready
       setReady(true);
@@ -158,12 +164,11 @@ function AppGate({ children }: { children: React.ReactNode }) {
         clearTimeout(timeout);
         setReady(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.state.location.pathname]);
+  }, [hasInitialized, dispatch]);
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
           <p className="mt-4 text-white text-sm">Restoring your session…</p>
@@ -190,4 +195,3 @@ function RootComponent() {
     </Provider>
   );
 }
-
