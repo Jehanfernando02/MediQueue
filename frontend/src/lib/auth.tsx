@@ -2,19 +2,20 @@
  * lib/auth.tsx — Auth bridge
  *
  * Keeps the AuthProvider / useAuth surface that all route layouts use.
- * State is sourced from Redux (store/slices/authSlice).
- * logout() dispatches the real logoutThunk from thunks/.
+ * State is sourced ENTIRELY from Redux (store/slices/authSlice).
+ *
+ * The old `shimUser` useState has been removed — it created a race condition
+ * where Redux state and the shim were briefly out of sync during login,
+ * causing route guards to see user=null and redirect back to /login.
  */
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
-import { selectAuthUser, type Role, type AuthUser as ReduxAuthUser } from "@/store/slices/authSlice";
+import {
+  selectAuthUser,
+  type Role,
+  type AuthUser as ReduxAuthUser,
+} from "@/store/slices/authSlice";
 import { logoutThunk } from "@/thunks/authThunks";
 
 export type { Role };
@@ -30,9 +31,7 @@ export interface AuthUser {
 
 interface AuthCtx {
   user: AuthUser | null;
-  login: (email: string, role: Role, name?: string) => void;
   logout: () => void;
-  setRole: (role: Role) => void;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -61,34 +60,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const reduxUser = useAppSelector(selectAuthUser);
   const dispatch = useAppDispatch();
 
-  // Shim for pages not yet migrated to Redux thunks
-  const [shimUser, setShimUser] = useState<AuthUser | null>(null);
-
-  useEffect(() => {
-    if (reduxUser) setShimUser(toAuthUser(reduxUser));
-    else setShimUser(null);
-  }, [reduxUser]);
-
-  const user = reduxUser ? toAuthUser(reduxUser) : shimUser;
+  // Derive user directly from Redux — no local state, no race condition
+  const user = reduxUser ? toAuthUser(reduxUser) : null;
 
   return (
     <Ctx.Provider
       value={{
         user,
-        login: (email, role, name) => {
-          setShimUser({
-            email,
-            role,
-            name: name ?? email,
-            avatarSeed: makeAvatar(name ?? email),
-          });
-        },
         logout: () => {
-          setShimUser(null);
           dispatch(logoutThunk());
-        },
-        setRole: (role) => {
-          if (user) setShimUser({ ...user, role });
         },
       }}
     >
@@ -104,5 +84,9 @@ export function useAuth() {
 }
 
 export function homeForRole(role: Role): string {
-  return role === "patient" ? "/patient" : role === "doctor" ? "/doctor" : "/admin";
+  return role === "patient"
+    ? "/patient"
+    : role === "doctor"
+    ? "/doctor"
+    : "/admin";
 }
