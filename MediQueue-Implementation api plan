@@ -1,0 +1,463 @@
+# MediQueue — Backend Implementation Plan
+
+> **Stack:** FastAPI · PostgreSQL · Redis · Celery · Alembic · bcrypt · JWT
+> **Frontend:** TanStack Start (React 19 + TanStack Router) — all pages are currently seeded with **static mock data**. Every API endpoint below maps to a real frontend page/component.
+
+---
+
+## Frontend Analysis Summary
+
+| Page / Route | Current State | Backend Needs |
+|---|---|---|
+| `/login` | Mock `login(email, role)` — no HTTP call | `POST /auth/login` → JWT pair |
+| `/register` | Mock `login(email, role)` — no HTTP call | `POST /auth/register` |
+| `/patient/book` | Hardcoded `DOCTORS[]`, `SLOTS[]` | `GET /doctors`, `GET /doctors/:id/slots`, `POST /appointments` |
+| `/patient/appointments` | Hardcoded `ITEMS[]` | `GET /appointments/me` |
+| `/patient/queue` | Fake countdown timer | `GET /queue/my-position` |
+| `/patient/notifications` | Hardcoded `ITEMS[]` | `GET /notifications` + mark-read |
+| `/doctor/` (queue) | Hardcoded `SEED[]`, local state mutations | `GET /queue/today`, `PATCH /appointments/:id/status`, `POST /appointments/:id/notes` |
+| `/doctor/patients` | Hardcoded | `GET /patients` (doctor-scoped) |
+| `/doctor/schedule` | Hardcoded | `GET /doctors/me/schedule` |
+| `/admin/` | Hardcoded charts + activity feed | `GET /analytics/overview`, `GET /audit-logs` |
+| `/admin/doctors` | Local `useState` CRUD | Full `GET/POST/PATCH/DELETE /doctors` |
+| `/admin/departments` | Local state | Full `GET/POST/PATCH/DELETE /departments` |
+| `/admin/appointments` | Hardcoded table, filter by status | `GET /appointments` (admin, paginated, filterable) |
+| `/admin/audit` | Hardcoded `LOGS[]` | `GET /audit-logs` (paginated) |
+| `/admin/reports` | Static | `GET /analytics/reports` |
+
+**Auth state** is stored in `localStorage` via `AuthProvider` (no Redux yet). The plan below migrates to **Redux slices + Axios interceptors** as you requested.
+
+---
+
+## Technology Decisions
+
+```
+backend/
+├── FastAPI                 # Core API
+├── SQLAlchemy 2.0          # ORM (async)
+├── Alembic                 # Migrations
+├── PostgreSQL              # Source of truth
+├── Redis                   # Cache + rate limit + refresh token store
+├── Celery + Redis broker   # Background tasks (reminders, cron)
+├── bcrypt / passlib        # Password hashing
+├── python-jose             # JWT
+├── Pydantic v2             # Request/response validation
+└── pytest + httpx          # Testing
+```
+
+```
+frontend/ (additions)
+├── Redux Toolkit           # State management
+├── Axios + interceptors    # HTTP client with silent token refresh
+└── Redux slices per domain # authSlice, appointmentSlice, doctorSlice, etc.
+```
+
+---
+
+## Project Folder Structure (Backend)
+
+```
+backend/
+├── alembic/
+│   └── versions/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                  # FastAPI app factory
+│   ├── config.py                # Pydantic Settings (.env)
+│   ├── database.py              # Async SQLAlchemy engine + session
+│   ├── redis_client.py          # Redis connection
+│   │
+│   ├── models/                  # SQLAlchemy ORM models
+│   │   ├── user.py
+│   │   ├── patient.py
+│   │   ├── doctor.py
+│   │   ├── department.py
+│   │   ├── time_slot.py
+│   │   ├── appointment.py
+│   │   ├── consultation_note.py
+│   │   ├── notification.py
+│   │   └── audit_log.py
+│   │
+│   ├── schemas/                 # Pydantic request/response schemas
+│   │   ├── auth.py
+│   │   ├── user.py
+│   │   ├── patient.py
+│   │   ├── doctor.py
+│   │   ├── department.py
+│   │   ├── appointment.py
+│   │   ├── notification.py
+│   │   └── analytics.py
+│   │
+│   ├── services/                # Business logic layer
+│   │   ├── auth_service.py
+│   │   ├── user_service.py
+│   │   ├── doctor_service.py
+│   │   ├── appointment_service.py
+│   │   ├── queue_service.py
+│   │   ├── notification_service.py
+│   │   └── analytics_service.py
+│   │
+│   ├── routers/                 # FastAPI routers (thin — delegate to services)
+│   │   ├── auth.py
+│   │   ├── users.py
+│   │   ├── doctors.py
+│   │   ├── departments.py
+│   │   ├── appointments.py
+│   │   ├── queue.py
+│   │   ├── notifications.py
+│   │   ├── audit_logs.py
+│   │   └── analytics.py
+│   │
+│   ├── middleware/
+│   │   ├── auth_middleware.py   # JWT decode + user injection
+│   │   ├── rbac.py             # Role permission matrix
+│   │   ├── rate_limit.py       # Redis-backed rate limiting
+│   │   ├── request_id.py       # UUID per request (logging)
+│   │   └── audit.py            # Automatic audit log writer
+│   │
+│   ├── tasks/                   # Celery tasks
+│   │   ├── celery_app.py
+│   │   ├── reminders.py        # 1hr-before appointment SMS/email
+│   │   └── cron.py             # Nightly no-show expiry
+│   │
+│   └── utils/
+│       ├── jwt.py
+│       ├── hashing.py
+│       ├── response.py         # Consistent { success, data, error, meta }
+│       └── exceptions.py       # Global exception handlers
+│
+├── tests/
+│   ├── test_auth.py
+│   ├── test_appointments.py
+│   └── test_queue.py
+│
+├── .env.dev
+├── .env.prod
+├── alembic.ini
+├── requirements.txt
+└── docker-compose.yml
+```
+
+---
+
+## Database Schema (Full ERD)
+
+```sql
+-- Core identity
+users          (id PK, email UNIQUE, password_hash, role ENUM, created_at, is_active)
+
+-- Role-specific profiles
+patients       (id PK, user_id FK→users, name, dob, blood_type, phone, created_at)
+departments    (id PK, name UNIQUE, description, created_at)
+doctors        (id PK, user_id FK→users, name, specialty, department_id FK→departments,
+                status ENUM('active','on_leave'), created_at)
+
+-- Scheduling
+time_slots     (id PK, doctor_id FK→doctors, day_of_week INT(0-6),
+                start_time TIME, end_time TIME, is_active BOOL)
+
+-- Appointments — the core table
+appointments   (id PK, patient_id FK→patients, doctor_id FK→doctors,
+                slot_id FK→time_slots, date DATE, start_time TIME,
+                status ENUM('scheduled','arrived','in_progress','done','cancelled','no_show'),
+                notes_count INT DEFAULT 0, created_at, updated_at)
+
+-- Indexes (query optimization):
+-- INDEX ON appointments(doctor_id, date)     ← doctor's daily queue
+-- INDEX ON appointments(patient_id)           ← patient history
+-- INDEX ON appointments(status, date)         ← admin filtering
+-- INDEX ON users(email)                       ← login lookup
+
+-- Clinical records
+consultation_notes (id PK, appointment_id FK→appointments, doctor_id FK→doctors,
+                    content TEXT, created_at)
+
+-- Notifications
+notifications  (id PK, user_id FK→users, type VARCHAR, title, body,
+                is_read BOOL DEFAULT FALSE, created_at)
+
+-- Audit (INSERT-ONLY — never updated/deleted)
+audit_logs     (id PK, user_id FK→users, action VARCHAR, entity VARCHAR,
+                entity_id VARCHAR, metadata JSONB, ip_address VARCHAR,
+                request_id VARCHAR, created_at)
+```
+
+---
+
+## API Endpoint Map
+
+### Auth (`/api/v1/auth`)
+| Method | Endpoint | Frontend Trigger | Role |
+|---|---|---|---|
+| POST | `/register` | `/register` form submit | Public |
+| POST | `/login` | `/login` form submit | Public |
+| POST | `/refresh` | Axios interceptor on 401 | Authenticated |
+| POST | `/logout` | Sidebar logout button | Authenticated |
+| POST | `/forgot-password` | Login "Forgot?" dialog | Public |
+
+### Users (`/api/v1/users`)
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/me` | Current user profile |
+| PATCH | `/me` | Update profile |
+
+### Doctors (`/api/v1/doctors`)
+| Method | Endpoint | Frontend Page | Role |
+|---|---|---|---|
+| GET | `/` | `/patient/book` step 1 — doctor list | Patient, Admin |
+| GET | `/:id` | Doctor detail | Any |
+| GET | `/:id/slots?date=` | `/patient/book` step 2 — time slots | Patient |
+| POST | `/` | `/admin/doctors` add button | Admin |
+| PATCH | `/:id` | `/admin/doctors` edit dialog | Admin |
+| DELETE | `/:id` | `/admin/doctors` delete button | Admin |
+| GET | `/me/schedule` | `/doctor/schedule` | Doctor |
+| GET | `/me/patients` | `/doctor/patients` | Doctor |
+
+### Departments (`/api/v1/departments`)
+| Method | Endpoint | Frontend Page | Role |
+|---|---|---|---|
+| GET | `/` | `/admin/departments`, `/patient/book` filter | Any |
+| POST | `/` | `/admin/departments` add | Admin |
+| PATCH | `/:id` | Edit dept | Admin |
+| DELETE | `/:id` | Delete dept | Admin |
+
+### Appointments (`/api/v1/appointments`)
+| Method | Endpoint | Frontend Page | Role |
+|---|---|---|---|
+| POST | `/` | `/patient/book` confirm dialog | Patient |
+| GET | `/me` | `/patient/appointments` timeline | Patient |
+| DELETE | `/me/:id` | Cancel appointment | Patient |
+| GET | `/` | `/admin/appointments` table | Admin |
+| GET | `/today` | `/doctor/` queue (today's list) | Doctor |
+| PATCH | `/:id/status` | Doctor queue status buttons (arrived/in-progress/done) | Doctor |
+| POST | `/:id/notes` | Doctor notes panel Save | Doctor |
+| GET | `/:id/notes` | Doctor notes panel view | Doctor |
+
+### Queue (`/api/v1/queue`)
+| Method | Endpoint | Frontend Page | Role |
+|---|---|---|---|
+| GET | `/my-position` | `/patient/queue` position widget | Patient |
+| GET | `/doctor/:id/today` | `/doctor/` stat cards | Doctor |
+
+### Notifications (`/api/v1/notifications`)
+| Method | Endpoint | Frontend Page |
+|---|---|---|
+| GET | `/` | `/patient/notifications` list |
+| PATCH | `/:id/read` | Mark single as read |
+| PATCH | `/read-all` | "Mark all as read" button |
+
+### Audit Logs (`/api/v1/audit-logs`)
+| Method | Endpoint | Frontend Page | Role |
+|---|---|---|---|
+| GET | `/` | `/admin/audit` timeline | Admin |
+
+### Analytics (`/api/v1/analytics`)
+| Method | Endpoint | Frontend Page | Role |
+|---|---|---|---|
+| GET | `/overview` | `/admin/` stat cards + charts | Admin |
+| GET | `/reports?period=daily\|weekly` | `/admin/reports` | Admin |
+
+---
+
+## Consistent API Response Shape
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "error": null,
+  "meta": {
+    "request_id": "uuid",
+    "page": 1,
+    "per_page": 20,
+    "total": 142
+  }
+}
+```
+
+---
+
+## RBAC Permission Matrix
+
+```python
+PERMISSIONS = {
+    "admin":   ["*"],                                    # full access
+    "doctor":  ["appointments:read_own", "appointments:update_status",
+                "notes:write", "notes:read", "queue:read_own",
+                "patients:read", "doctors:read_self"],
+    "patient": ["appointments:create", "appointments:read_own",
+                "appointments:cancel_own", "doctors:read",
+                "queue:read_own", "notifications:read_own"],
+}
+```
+
+---
+
+## Redux Slices Plan (Frontend Migration)
+
+Replace the current `localStorage`-only `AuthProvider` with full Redux:
+
+```
+src/store/
+├── store.ts                    # configureStore
+├── slices/
+│   ├── authSlice.ts            # user, tokens, login/logout thunks
+│   ├── appointmentSlice.ts     # my appointments, booking flow
+│   ├── doctorSlice.ts          # doctor list, slots, search
+│   ├── queueSlice.ts           # live position, queue items
+│   ├── notificationSlice.ts    # notification list, unread count
+│   └── adminSlice.ts           # doctors CRUD, departments CRUD
+└── api/
+    ├── axiosClient.ts          # Axios instance + interceptors
+    ├── authApi.ts
+    ├── appointmentApi.ts
+    ├── doctorApi.ts
+    └── queueApi.ts
+```
+
+**Silent refresh flow (Axios interceptor):**
+1. On 401 → call `POST /auth/refresh` with `refreshToken` from Redux state
+2. On success → update `accessToken` in Redux + retry original request
+3. On refresh failure → dispatch `logout()` → redirect to `/login`
+
+---
+
+## Implementation Phases
+
+### ✅ Phase 1 — Foundation (Start Here)
+> Goal: Working auth + DB + migrations + project skeleton
+
+1. Init Python project — `pyproject.toml`, `requirements.txt`, virtual env
+2. `config.py` — Pydantic `BaseSettings` with `.env.dev`
+3. `database.py` — Async SQLAlchemy engine + session factory
+4. `redis_client.py` — async Redis connection pool
+5. All **SQLAlchemy models** (all 9 tables)
+6. **Alembic** — `alembic init`, first migration, `alembic upgrade head`
+7. **Auth service** — `register`, `login`, `create_access_token`, `create_refresh_token`
+8. **Auth router** — `/register`, `/login`, `/refresh`, `/logout`
+9. JWT middleware — decode + inject current user into request state
+10. Global exception handler + `response.py` utility
+11. Request ID middleware
+12. `main.py` — assemble app, register routers, CORS
+
+**Deliverable:** `POST /auth/register` + `POST /auth/login` fully working. Tokens issued. Refresh token stored in Redis.
+
+---
+
+### ✅ Phase 2 — Core Services
+> Goal: All CRUD endpoints that unblock frontend pages
+
+1. Doctor + Department models → routers → services
+2. Time slot generation logic
+3. **Appointment service** — booking with conflict detection (DB-level lock), cancel
+4. Appointment router — all endpoints
+5. RBAC middleware — enforce `PERMISSIONS` matrix per route
+6. Queue service — `get_my_position()`, `get_doctor_queue_today()`
+7. Consultation notes endpoint
+8. Audit log — auto-written by middleware on every mutating request
+9. Notification model + basic CRUD
+10. Rate limiter — Redis sliding window, 5 req/min on `POST /appointments`
+11. **DB indexes** — `appointments(doctor_id, date)`, `users(email)`, etc.
+
+---
+
+### ✅ Phase 3 — Advanced Features
+> Goal: Redis cache, background tasks, analytics, testing
+
+1. **Redis cache** — doctor availability + today's queue (TTL 60s, invalidated on booking)
+2. **Celery setup** — `celery_app.py`, worker config
+3. **Reminder task** — scan appointments due in 1hr, push notification
+4. **Cron task** — nightly `no_show` sweep for past `scheduled` appointments
+5. Analytics service — aggregate queries for admin dashboard
+6. Reports endpoint — daily/weekly summaries
+7. Swagger groups — tag endpoints by role
+8. **pytest suite** — auth, appointment booking, conflict detection, RBAC
+9. GitHub Actions CI — lint + test on push
+
+---
+
+### ✅ Phase 4 — Frontend Integration (Redux)
+> Goal: Replace all mock data with real API calls
+
+1. Install Redux Toolkit + Axios in frontend
+2. `axiosClient.ts` — base URL, token injection, 401 interceptor
+3. `authSlice.ts` + thunks → wire to `/login`, `/register`
+4. Replace `AuthProvider` localStorage with Redux persist
+5. `doctorSlice.ts` → wire `/patient/book` page (step 1 + step 2)
+6. `appointmentSlice.ts` → wire booking confirm, `/patient/appointments`
+7. `queueSlice.ts` → wire `/patient/queue` + `/doctor/` queue
+8. `notificationSlice.ts` → wire `/patient/notifications`
+9. `adminSlice.ts` → wire all admin pages (doctors, departments, appointments, audit)
+10. Polling or WebSocket for live queue updates
+
+---
+
+## Key Engineering Decisions & Non-obvious Parts
+
+### 1. Slot Conflict Detection
+```python
+# In appointment_service.py — use SELECT FOR UPDATE to prevent race conditions
+async def book_appointment(db, patient_id, doctor_id, slot_id, date):
+    async with db.begin():
+        existing = await db.execute(
+            select(Appointment)
+            .where(Appointment.doctor_id == doctor_id)
+            .where(Appointment.date == date)
+            .where(Appointment.slot_id == slot_id)
+            .where(Appointment.status.notin_(["cancelled", "no_show"]))
+            .with_for_update()  # DB-level lock
+        )
+        if existing.scalar():
+            raise ConflictError("Slot already booked")
+        # create appointment ...
+```
+
+### 2. Queue Position Calculation
+```python
+# Not just "position 4 of 10" — accounts for cancellations and in-progress
+def calculate_queue_position(appointments: list, patient_id: int) -> dict:
+    active = [a for a in appointments if a.status not in ("cancelled", "no_show", "done")]
+    position = next((i+1 for i, a in enumerate(active) if a.patient_id == patient_id), None)
+    ahead = position - 1 if position else 0
+    eta_minutes = ahead * AVG_CONSULT_MINUTES
+    return {"position": position, "ahead": ahead, "eta_minutes": eta_minutes}
+```
+
+### 3. Single-Use Refresh Tokens (Token Rotation)
+```python
+# Redis key: refresh:<token_hash> → user_id, TTL 7 days
+# On refresh: DELETE old key, issue new token pair
+# On logout: DELETE key immediately → invalidated even if stolen
+```
+
+### 4. Audit Log Immutability
+```python
+# No update/delete methods exist on AuditLog model
+# All inserts happen via middleware — not manually in service layer
+# This ensures no service can skip audit logging
+```
+
+---
+
+## Where to Start (Right Now)
+
+```
+Phase 1, Step 1: Initialize the backend project
+```
+
+```bash
+cd /Users/jehanfernando/Desktop/Projects/mediwave-prime/backend
+python -m venv venv
+source venv/bin/activate
+pip install fastapi uvicorn sqlalchemy asyncpg alembic pydantic-settings \
+            python-jose passlib[bcrypt] redis[asyncio] celery
+```
+
+Then we build in this exact order:
+1. `config.py` → `.env.dev`
+2. `database.py`  
+3. All models (one file per table)
+4. Alembic migration
+5. Auth service + router
+6. `main.py`
+

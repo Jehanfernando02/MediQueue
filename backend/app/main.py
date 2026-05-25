@@ -9,7 +9,7 @@ from app.config import settings
 from app.database import engine
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.logging_middleware import LoggingMiddleware
-from app.routers import auth, doctors, departments, appointments, queue, notifications, reports, audit, demo
+from app.routers import auth, doctors, departments, appointments, queue, notifications, reports, audit
 
 
 # Configure structured logging
@@ -108,7 +108,6 @@ app.include_router(notifications.router, prefix=API_PREFIX)
 # Phase 3 — Advanced
 app.include_router(reports.router, prefix=API_PREFIX)
 app.include_router(audit.router, prefix=API_PREFIX)
-app.include_router(demo.router, prefix=API_PREFIX)
 
 
 
