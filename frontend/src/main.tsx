@@ -7,20 +7,19 @@ import "./styles.css";
 // Import routes
 import { routeTree } from "./routeTree.gen";
 
-// Create query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
-// Create router
+// Create router with context
 const router = createRouter({
   routeTree,
-  context: { queryClient },
+  context: {
+    queryClient: new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 1000 * 60 * 5, // 5 minutes
+          refetchOnWindowFocus: false,
+        },
+      },
+    }),
+  },
   scrollRestoration: true,
   defaultPreloadStaleTime: 0,
   defaultPreload: "intent",
