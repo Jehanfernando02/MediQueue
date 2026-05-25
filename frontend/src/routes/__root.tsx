@@ -136,11 +136,17 @@ function AppGate({ children }: { children: React.ReactNode }) {
     }
 
     // Attempt session restore; mark ready when settled (success or failure)
+    // Add a timeout to prevent hanging if API is unavailable
+    const timeout = setTimeout(() => {
+      setReady(true);
+    }, 5000); // 5 second timeout
+
     (dispatch(restoreSessionThunk()) as unknown as Promise<void>)
       .catch(() => {
         // Ignore errors, just mark as ready
       })
       .finally(() => {
+        clearTimeout(timeout);
         setReady(true);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

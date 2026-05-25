@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS — Comma-separated origins (stored as string, parsed on demand)
-    ALLOWED_ORIGINS: str = "http://localhost:8080,http://localhost:8081,http://localhost:8082"
+    ALLOWED_ORIGINS: str = "http://localhost:8080,http://localhost:8081,http://localhost:8082,https://mediq-care.vercel.app"
 
     # Rate limiting
     RATE_LIMIT_BOOKING_PER_MINUTE: int = 5
