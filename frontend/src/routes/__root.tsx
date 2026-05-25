@@ -136,9 +136,13 @@ function AppGate({ children }: { children: React.ReactNode }) {
     }
 
     // Attempt session restore; mark ready when settled (success or failure)
-    (dispatch(restoreSessionThunk()) as unknown as Promise<void>).finally(() => {
-      setReady(true);
-    });
+    (dispatch(restoreSessionThunk()) as unknown as Promise<void>)
+      .catch(() => {
+        // Ignore errors, just mark as ready
+      })
+      .finally(() => {
+        setReady(true);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -162,8 +166,10 @@ function RootComponent() {
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Outlet />
-          <Toaster richColors position="top-right" />
+          <AppGate>
+            <Outlet />
+            <Toaster richColors position="top-right" />
+          </AppGate>
         </AuthProvider>
       </QueryClientProvider>
     </Provider>
