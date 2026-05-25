@@ -162,10 +162,8 @@ function RootComponent() {
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <AppGate>
-            <Outlet />
-            <Toaster richColors position="top-right" />
-          </AppGate>
+          <Outlet />
+          <Toaster richColors position="top-right" />
         </AuthProvider>
       </QueryClientProvider>
     </Provider>
