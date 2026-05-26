@@ -253,6 +253,7 @@ class DoctorService:
         """Update doctor's weekly slots template by replacing the old ones."""
         from app.models.time_slot import TimeSlot
         import uuid
+        from datetime import datetime, timedelta, date
 
         dr_uuid = uuid.UUID(doctor_id) if isinstance(doctor_id, str) else doctor_id
 
@@ -261,16 +262,25 @@ class DoctorService:
             delete(TimeSlot).where(TimeSlot.doctor_id == dr_uuid)
         )
 
-        # Add new slots
+        # Add new slots split into 30-minute intervals
         for s in slots_data:
-            slot = TimeSlot(
-                doctor_id=dr_uuid,
-                day_of_week=s.day_of_week,
-                start_time=s.start_time,
-                end_time=s.end_time,
-                is_active=True,
-            )
-            db.add(slot)
+            current_start = datetime.combine(date.today(), s.start_time)
+            final_end = datetime.combine(date.today(), s.end_time)
+
+            while current_start < final_end:
+                current_end = current_start + timedelta(minutes=30)
+                if current_end > final_end:
+                    break
+
+                slot = TimeSlot(
+                    doctor_id=dr_uuid,
+                    day_of_week=s.day_of_week,
+                    start_time=current_start.time(),
+                    end_time=current_end.time(),
+                    is_active=True,
+                )
+                db.add(slot)
+                current_start = current_end
 
         await db.commit()
 
