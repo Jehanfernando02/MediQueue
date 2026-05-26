@@ -1,15 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
+import { Outlet, Link, createRootRouteWithContext } from "@tanstack/react-router";
 import { Provider } from "react-redux";
 import { useEffect, useState } from "react";
 
-import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { store } from "@/store/store";
@@ -72,103 +65,53 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 // ---------------------------------------------------------------------------
 // Route definition
+// NO shellComponent / HeadContent / Scripts — those are TanStack Start SSR
+// APIs that do not exist in plain @tanstack/react-router SPA builds.
+// Using them in a Vite SPA causes silent hydration failure on every route
+// except "/" because the server returns empty HTML that React can't mount.
 // ---------------------------------------------------------------------------
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MediQueue — Clinical Appointment & Patient Flow" },
-      {
-        name: "description",
-        content:
-          "MediQueue is a hospital-grade SaaS for appointments, live patient queues and clinic operations.",
-      },
-      { property: "og:title", content: "MediQueue — Clinical Appointment & Patient Flow" },
-      {
-        property: "og:description",
-        content: "Hospital-grade SaaS for appointments and patient flow.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
-      },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
 
 // ---------------------------------------------------------------------------
-// Shell (SSR HTML wrapper)
-// ---------------------------------------------------------------------------
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AppGate — blocks rendering until session restoration is complete.
+// AppGate — blocks rendering until session restoration settles.
 //
-// On page refresh Redux is cleared (in-memory). Without this gate,
-// route guards would see `user = null` and redirect to /login before
-// restoreSessionThunk() has a chance to rehydrate the auth state.
-//
-// Rules:
-//  • Runs ONCE on mount (empty dep array) — never re-runs on navigation.
-//  • Auth pages (/login, /register) skip restoration and go straight to ready.
-//  • No refresh token → skip straight to ready (no spinner flash).
-//  • Token present → wait for restore to settle (max 5 s timeout).
+// Lazy useState initializer computes the correct starting value
+// synchronously — so the spinner never flashes for auth pages or
+// users with no stored token.
 // ---------------------------------------------------------------------------
 function AppGate({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
-  const [ready, setReady] = useState(false);
+
+  const [ready, setReady] = useState(() => {
+    const isAuthPage =
+      window.location.pathname === "/login" ||
+      window.location.pathname === "/register";
+    const hasToken = !!localStorage.getItem("mediqueue.refresh_token");
+    // Ready immediately — no restore needed
+    return isAuthPage || !hasToken;
+  });
 
   useEffect(() => {
-    const currentPath = window.location.pathname;
-    const isAuthPage = currentPath === "/login" || currentPath === "/register";
-    const hasToken = !!localStorage.getItem("mediqueue.refresh_token");
+    // If already ready (auth page or no token), skip
+    if (ready) return;
 
-    // Nothing to restore — go straight to ready
-    if (isAuthPage || !hasToken) {
-      setReady(true);
-      return;
-    }
-
-    // Attempt session restore; mark ready when settled (success or failure)
     const timeout = setTimeout(() => setReady(true), 5000);
 
     (dispatch(restoreSessionThunk()) as unknown as Promise<void>)
-      .catch(() => {
-        // Silently ignore — the user will just land on /login
-      })
+      .catch(() => {})
       .finally(() => {
         clearTimeout(timeout);
         setReady(true);
       });
-  }, []); // ← empty: runs once on mount only, not on every navigation
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
           <p className="mt-4 text-white text-sm">Restoring your session…</p>
