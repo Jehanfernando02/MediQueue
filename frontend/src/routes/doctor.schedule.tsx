@@ -142,13 +142,17 @@ function Schedule() {
 
   const loadDefaults = () => {
     const defaultHours = [
-      { start_time: "09:00", end_time: "10:00" },
-      { start_time: "10:00", end_time: "11:00" },
-      { start_time: "11:00", end_time: "12:00" },
-      { start_time: "13:00", end_time: "14:00" },
-      { start_time: "14:00", end_time: "15:00" },
-      { start_time: "15:00", end_time: "16:00" },
-      { start_time: "16:00", end_time: "17:00" },
+      { start_time: "09:00", end_time: "09:30" },
+      { start_time: "09:30", end_time: "10:00" },
+      { start_time: "10:00", end_time: "10:30" },
+      { start_time: "10:30", end_time: "11:00" },
+      { start_time: "11:00", end_time: "11:30" },
+      { start_time: "11:30", end_time: "12:00" },
+      { start_time: "14:00", end_time: "14:30" },
+      { start_time: "14:30", end_time: "15:00" },
+      { start_time: "15:00", end_time: "15:30" },
+      { start_time: "15:30", end_time: "16:00" },
+      { start_time: "16:00", end_time: "16:30" },
     ];
     const defaults = [];
     for (let day = 0; day < 6; day++) {
@@ -160,7 +164,7 @@ function Schedule() {
       }
     }
     setTempSlots(defaults);
-    toast.success("Loaded default 9am - 5pm schedule template");
+    toast.success("Loaded default 30-minute schedule template");
   };
 
   const handleSave = async () => {
