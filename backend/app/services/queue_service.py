@@ -71,15 +71,28 @@ class QueueService:
     ) -> dict:
         """Get queue statistics for doctor today (with 20s Redis cache)."""
         from sqlalchemy import select, func
+        import app.redis_client
         from app.redis_client import redis_client
         import json
+        import logging
 
+        logger = logging.getLogger(__name__)
         cache_key = f"queue:stats:{doctor_id}"
+        cached = None
         
         # Try cache
-        cached = await redis_client.get(cache_key)
+        if app.redis_client.redis_available:
+            try:
+                cached = await redis_client.get(cache_key)
+            except Exception as e:
+                logger.warning(f"Redis cache read failed: {e}. Bypassing cache and disabling Redis.")
+                app.redis_client.redis_available = False
+
         if cached:
-            return json.loads(cached)
+            try:
+                return json.loads(cached)
+            except Exception:
+                pass
 
         today = date.today()
 
@@ -125,7 +138,12 @@ class QueueService:
         }
 
         # Cache for 20 seconds (short enough for near real-time, long enough to skip 30s poll bursts)
-        await redis_client.setex(cache_key, 20, json.dumps(stats))
+        if app.redis_client.redis_available:
+            try:
+                await redis_client.setex(cache_key, 20, json.dumps(stats))
+            except Exception as e:
+                logger.warning(f"Redis cache write failed: {e}. Disabling Redis.")
+                app.redis_client.redis_available = False
 
         return stats
 
