@@ -42,7 +42,7 @@ class DoctorService:
         db: AsyncSession,
         data: DoctorCreate,
     ) -> Doctor:
-        """Create a new doctor with user account."""
+        """Create a new doctor with user account and default schedule slots."""
         # Check duplicate email
         result = await db.execute(
             select(User).where(User.email == data.email)
@@ -67,6 +67,34 @@ class DoctorService:
             department_id=data.department_id,
         )
         db.add(doctor)
+        await db.flush()  # flush to generate doctor.id
+
+        # Generate default weekly slots: Mon-Sat, 9am-5pm (excluding 12pm-1pm lunch)
+        from app.models.time_slot import TimeSlot
+        from datetime import time
+
+        default_hours = [
+            (time(9, 0), time(10, 0)),
+            (time(10, 0), time(11, 0)),
+            (time(11, 0), time(12, 0)),
+            (time(13, 0), time(14, 0)),
+            (time(14, 0), time(15, 0)),
+            (time(15, 0), time(16, 0)),
+            (time(16, 0), time(17, 0)),
+        ]
+
+        # Monday (0) to Saturday (5)
+        for day in range(6):
+            for start, end in default_hours:
+                slot = TimeSlot(
+                    doctor_id=doctor.id,
+                    day_of_week=day,
+                    start_time=start,
+                    end_time=end,
+                    is_active=True,
+                )
+                db.add(slot)
+
         await db.commit()
         await db.refresh(doctor)
         return doctor
