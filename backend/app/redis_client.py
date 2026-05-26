@@ -24,6 +24,7 @@ except Exception as e:
 
 async def get_redis() -> aioredis.Redis | None:
     """Get Redis client if available, otherwise return None."""
+    global redis_available
     if not redis_available or redis_client is None:
         return None
     try:
@@ -31,5 +32,6 @@ async def get_redis() -> aioredis.Redis | None:
         await redis_client.ping()
         return redis_client
     except Exception as e:
-        logger.warning(f"Redis connection failed: {e}")
+        logger.warning(f"Redis connection failed: {e}. Disabling Redis caching/rate-limiting.")
+        redis_available = False
         return None
