@@ -1,10 +1,10 @@
 from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.models.doctor import Doctor
 from app.models.user import User, UserRole
-from app.schemas.doctor import DoctorCreate, DoctorUpdate
+from app.schemas.doctor import DoctorCreate, DoctorUpdate, DoctorSlotItem
 from app.utils.exceptions import NotFoundError, ConflictError
 from app.utils.hashing import hash_password
 
@@ -232,6 +232,36 @@ class DoctorService:
                 } for a in appointments
             ]
         }
+
+    async def update_slots(
+        self,
+        db: AsyncSession,
+        doctor_id: str,
+        slots_data: list[DoctorSlotItem],
+    ) -> None:
+        """Update doctor's weekly slots template by replacing the old ones."""
+        from app.models.time_slot import TimeSlot
+        import uuid
+
+        dr_uuid = uuid.UUID(doctor_id) if isinstance(doctor_id, str) else doctor_id
+
+        # Delete all existing slots for this doctor
+        await db.execute(
+            delete(TimeSlot).where(TimeSlot.doctor_id == dr_uuid)
+        )
+
+        # Add new slots
+        for s in slots_data:
+            slot = TimeSlot(
+                doctor_id=dr_uuid,
+                day_of_week=s.day_of_week,
+                start_time=s.start_time,
+                end_time=s.end_time,
+                is_active=True,
+            )
+            db.add(slot)
+
+        await db.commit()
 
 
 doctor_service = DoctorService()
