@@ -6,7 +6,7 @@ from app.models.user import User, UserRole
 from app.middleware.auth_middleware import get_current_user, require_admin, require_doctor, require_any
 from app.services.doctor_service import doctor_service
 from app.services.appointment_service import appointment_service
-from app.schemas.doctor import DoctorCreate, DoctorUpdate, DoctorResponse
+from app.schemas.doctor import DoctorCreate, DoctorUpdate, DoctorResponse, DoctorSlotsUpdate
 from app.utils.response import success_response
 from app.services.audit_service import audit_service
 from fastapi import Request
@@ -238,4 +238,18 @@ async def get_doctor_slots(
     return success_response(
         data=slots,
         message="Doctor slots retrieved successfully.",
+    )
+
+
+@router.put("/me/slots", summary="Update current doctor's weekly available slots")
+async def update_my_slots(
+    body: DoctorSlotsUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_doctor),
+):
+    """Update current doctor's recurring weekly availability slots template."""
+    doctor = await doctor_service.get_doctor_by_user_id(db, str(current_user.id))
+    await doctor_service.update_slots(db, str(doctor.id), body.slots)
+    return success_response(
+        message="Weekly availability slots updated successfully."
     )
