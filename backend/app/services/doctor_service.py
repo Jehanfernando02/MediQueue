@@ -37,6 +37,40 @@ class DoctorService:
             raise NotFoundError("Doctor")
         return doctor
 
+    async def generate_default_slots(self, db: AsyncSession, doctor_id: str) -> None:
+        """Generate default weekly slots (Mon-Sat, 30-min intervals) for a doctor."""
+        from app.models.time_slot import TimeSlot
+        from datetime import time
+        import uuid
+
+        dr_uuid = uuid.UUID(doctor_id) if isinstance(doctor_id, str) else doctor_id
+
+        default_hours = [
+            (time(9, 0), time(9, 30)),
+            (time(9, 30), time(10, 0)),
+            (time(10, 0), time(10, 30)),
+            (time(10, 30), time(11, 0)),
+            (time(11, 0), time(11, 30)),
+            (time(11, 30), time(12, 0)),
+            (time(14, 0), time(14, 30)),
+            (time(14, 30), time(15, 0)),
+            (time(15, 0), time(15, 30)),
+            (time(15, 30), time(16, 0)),
+            (time(16, 0), time(16, 30)),
+        ]
+
+        # Monday (0) to Saturday (5)
+        for day in range(6):
+            for start, end in default_hours:
+                slot = TimeSlot(
+                    doctor_id=dr_uuid,
+                    day_of_week=day,
+                    start_time=start,
+                    end_time=end,
+                    is_active=True,
+                )
+                db.add(slot)
+
     async def create_doctor(
         self,
         db: AsyncSession,
@@ -69,31 +103,8 @@ class DoctorService:
         db.add(doctor)
         await db.flush()  # flush to generate doctor.id
 
-        # Generate default weekly slots: Mon-Sat, 9am-5pm (excluding 12pm-1pm lunch)
-        from app.models.time_slot import TimeSlot
-        from datetime import time
-
-        default_hours = [
-            (time(9, 0), time(10, 0)),
-            (time(10, 0), time(11, 0)),
-            (time(11, 0), time(12, 0)),
-            (time(13, 0), time(14, 0)),
-            (time(14, 0), time(15, 0)),
-            (time(15, 0), time(16, 0)),
-            (time(16, 0), time(17, 0)),
-        ]
-
-        # Monday (0) to Saturday (5)
-        for day in range(6):
-            for start, end in default_hours:
-                slot = TimeSlot(
-                    doctor_id=doctor.id,
-                    day_of_week=day,
-                    start_time=start,
-                    end_time=end,
-                    is_active=True,
-                )
-                db.add(slot)
+        # Generate default weekly slots
+        await self.generate_default_slots(db, str(doctor.id))
 
         await db.commit()
         await db.refresh(doctor)

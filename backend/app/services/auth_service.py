@@ -72,6 +72,9 @@ class AuthService:
                 specialty="General",  # Admin will update later
             )
             db.add(profile)
+            await db.flush()
+            from app.services.doctor_service import doctor_service
+            await doctor_service.generate_default_slots(db, str(profile.id))
         # admin: no profile table required
 
         await db.commit()
