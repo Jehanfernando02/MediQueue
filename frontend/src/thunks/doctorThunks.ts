@@ -131,3 +131,19 @@ export const deleteDoctorThunk =
       return { success: false, error: message };
     }
   };
+
+export const updateDoctorSlotsThunk =
+  (slots: { day_of_week: number; start_time: string; end_time: string }[]) =>
+  async (dispatch: AppDispatch): Promise<{ success: boolean; error?: string }> => {
+    dispatch(setDoctorsLoading());
+    try {
+      await api.put("/doctors/me/slots", { slots });
+      const { data } = await api.get("/doctors/me/schedule");
+      dispatch(setScheduleSuccess(data.data));
+      return { success: true };
+    } catch (err) {
+      const message = extractError(err);
+      dispatch(setDoctorsError(message));
+      return { success: false, error: message };
+    }
+  };
