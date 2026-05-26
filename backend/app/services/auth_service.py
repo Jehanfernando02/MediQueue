@@ -15,7 +15,7 @@ from app.models.doctor import Doctor
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.utils.hashing import hash_password, verify_password
 from app.utils.jwt import create_access_token, create_refresh_token, decode_token
-from app.utils.exceptions import UnauthorizedError, ConflictError, NotFoundError
+from app.utils.exceptions import UnauthorizedError, ConflictError, NotFoundError, MediQueueException
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,9 @@ class AuthService:
                     str(user.id),
                 )
             except Exception as e:
-                logger.warning(f"Failed to store refresh token in Redis: {e}")
+                logger.warning(f"Failed to store refresh token in Redis: {e}. Disabling Redis.")
+                import app.redis_client
+                app.redis_client.redis_available = False
 
         return tokens
 
@@ -146,8 +148,13 @@ class AuthService:
 
                 # DELETE old token immediately (rotation)
                 await redis.delete(redis_key)
+            except MediQueueException:
+                # Re-raise custom exceptions to prevent swallowing them
+                raise
             except Exception as e:
-                logger.warning(f"Redis error during refresh: {e}. Falling back to JWT-only validation.")
+                logger.warning(f"Redis error during refresh: {e}. Falling back to JWT-only validation and disabling Redis.")
+                import app.redis_client
+                app.redis_client.redis_available = False
 
         # Fetch user
         result = await db.execute(select(User).where(User.id == user_id))
@@ -168,7 +175,9 @@ class AuthService:
                     str(user.id),
                 )
             except Exception as e:
-                logger.warning(f"Failed to store new refresh token in Redis: {e}")
+                logger.warning(f"Failed to store new refresh token in Redis: {e}. Disabling Redis.")
+                import app.redis_client
+                app.redis_client.redis_available = False
 
         return new_tokens
 
@@ -185,7 +194,9 @@ class AuthService:
                 token_hash = _hash_token(refresh_token)
                 await redis.delete(_refresh_key(token_hash))
             except Exception as e:
-                logger.warning(f"Failed to delete refresh token from Redis: {e}")
+                logger.warning(f"Failed to delete refresh token from Redis: {e}. Disabling Redis.")
+                import app.redis_client
+                app.redis_client.redis_available = False
         # If Redis is not available, logout still succeeds (token will expire naturally)
 
     # -----------------------------------------------------------------------
