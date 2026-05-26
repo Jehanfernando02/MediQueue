@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, time
 
 
 class DoctorCreate(BaseModel):
@@ -37,3 +37,14 @@ class DoctorResponse(BaseModel):
 class DoctorDetailResponse(DoctorResponse):
     email: str | None = None  # If user data is joined
     department_name: str | None = None  # If department data is joined
+
+
+class DoctorSlotItem(BaseModel):
+    day_of_week: int = Field(..., ge=0, le=6, description="0=Monday, 6=Sunday")
+    start_time: time
+    end_time: time
+
+
+class DoctorSlotsUpdate(BaseModel):
+    slots: list[DoctorSlotItem]
+
