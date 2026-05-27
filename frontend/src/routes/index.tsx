@@ -24,7 +24,7 @@ function Landing() {
   }, [user, navigate]);
 
   return (
-    <div className="min-h-screen bg-background dot-grid selection:bg-brand/30 overflow-hidden">
+    <div className="min-h-screen bg-background dot-grid selection:bg-brand/30 overflow-x-hidden">
 
       {/* Decorative Orbs */}
       <div className="absolute top-[-10%] left-[-10%] size-[500px] bg-brand/10 blur-[120px] rounded-full animate-pulse" />
