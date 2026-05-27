@@ -185,7 +185,7 @@ function Landing() {
           >
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand to-clinical z-10" />
             <video
-              src="/assets/demo.mov"
+              src="./assets/demo.mov"
               className="w-full block"
               controls
               autoPlay
