@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Heart, ArrowRight, ShieldCheck, Activity, CalendarCheck, Sparkles, MoveRight } from "lucide-react";
+import { Heart, Activity, CalendarCheck, Sparkles, MoveRight } from "lucide-react";
 import { useAuth, homeForRole } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [showDemo, setShowDemo] = useState(false);
 
   useEffect(() => {
     if (user) navigate({ to: homeForRole(user.role) });
@@ -39,11 +40,6 @@ function Landing() {
             <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Clinical OS</div>
           </div>
         </div>
-        {/* <nav className="hidden md:flex items-center gap-10 text-[10px] uppercase tracking-widest font-black text-muted-foreground">
-          <a href="#features" className="hover:text-brand transition-colors">Product</a>
-          <a href="#teams" className="hover:text-brand transition-colors">For teams</a>
-          <a href="#security" className="hover:text-brand transition-colors">Security</a>
-        </nav> */}
         <div className="flex items-center gap-6">
           <Link to="/login" className="text-[10px] uppercase tracking-widest font-black text-muted-foreground hover:text-brand transition-colors">
             Sign in
@@ -70,19 +66,40 @@ function Landing() {
           <p className="mt-10 text-xl text-muted-foreground max-w-xl leading-relaxed font-medium">
             MediQueue replaces chaotic paper trails and legacy software with a calm, high-performance view of your entire clinical practice.
           </p>
-          <div className="mt-12 flex flex-wrap gap-5">
+          <div className="mt-12 flex flex-wrap gap-5 items-center">
             <Link
               to="/register"
               className="group inline-flex items-center gap-3 rounded-2xl bg-brand text-brand-foreground px-8 py-4 text-xs font-black uppercase tracking-widest shadow-2xl shadow-brand/40 hover:scale-105 transition-all shimmer-sweep"
             >
               Start Free Trial <MoveRight className="size-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-3 rounded-2xl border border-border bg-card/40 backdrop-blur-md px-8 py-4 text-xs font-black uppercase tracking-widest hover:bg-muted transition-all shadow-sm"
-            >
-              Explore Demo
-            </Link>
+
+            {/* Explore Demo — highlighted */}
+            <div className="relative inline-flex" style={{ animation: "float 3s ease-in-out infinite" }}>
+              {/* Ping rings */}
+              <span className="absolute -inset-[3px] rounded-[18px] border border-clinical/40 animate-ping" style={{ animationDuration: "2s" }} />
+              <span className="absolute -inset-[7px] rounded-[22px] border border-clinical/20 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.5s" }} />
+
+              <button
+                onClick={() => setShowDemo(true)}
+                className="group relative z-10 inline-flex items-center gap-3 rounded-2xl border border-clinical/40 bg-card/40 backdrop-blur-md px-8 py-4 text-xs font-black uppercase tracking-widest hover:bg-muted transition-all shadow-[0_0_20px_rgba(0,0,0,0.08)] hover:shadow-[0_0_28px_color-mix(in_oklab,var(--clinical)_30%,transparent)] hover:border-clinical/60 hover:scale-105 cursor-pointer"
+              >
+                {/* Play icon */}
+                <span className="size-6 rounded-full bg-clinical/15 border border-clinical/40 grid place-items-center flex-shrink-0 group-hover:bg-clinical/25 transition-colors">
+                  <svg width="8" height="9" viewBox="0 0 8 9" fill="none">
+                    <path d="M1 1L7 4.5L1 8V1Z" fill="currentColor" className="text-clinical" />
+                  </svg>
+                </span>
+
+                <span className="flex flex-col leading-tight text-left">
+                  <span>Explore Demo</span>
+                  <span className="text-[9px] font-bold tracking-wider text-clinical/70 normal-case">Watch live walkthrough</span>
+                </span>
+
+                {/* Live dot */}
+                <span className="size-2 rounded-full bg-clinical animate-pulse flex-shrink-0" />
+              </button>
+            </div>
           </div>
           <div className="mt-16 flex items-center gap-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
             <div className="flex items-center gap-2"><Activity className="size-4 text-clinical" /> REAL-TIME QUEUE</div>
@@ -111,7 +128,7 @@ function Landing() {
                 { n: "Sarah Jenkins", t: "09:15", s: "Consulting", tone: "clinical" },
                 { n: "Marcus Lewis", t: "09:40", s: "Arrived", tone: "brand" },
                 { n: "Elena Halloway", t: "10:05", s: "Scheduled", tone: "muted" },
-              ].map((r, i) => (
+              ].map((r) => (
                 <div key={r.n} className="flex items-center gap-4 p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md shadow-sm transition-all hover:bg-white/10 group/item">
                   <div className="size-12 rounded-2xl bg-gradient-to-br from-brand to-clinical text-white grid place-items-center font-black text-sm shadow-lg group-hover/item:scale-110 transition-transform">
                     {r.n.split(" ").map((s) => s[0]).join("")}
@@ -153,13 +170,37 @@ function Landing() {
             <Heart className="size-4 text-brand" />
             <span>© {new Date().getFullYear()} MediQueue, Inc. All rights reserved.</span>
           </div>
-          {/* <div className="flex items-center gap-10">
-            <a href="#" className="hover:text-brand transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-brand transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-brand transition-colors">Contact Sales</a>
-          </div> */}
         </div>
       </footer>
+
+      {/* Demo Modal */}
+      {showDemo && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setShowDemo(false)}
+        >
+          <div
+            className="relative w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand to-clinical z-10" />
+            <video
+              src="/assets/demo.mov"
+              className="w-full block"
+              controls
+              autoPlay
+            />
+            <button
+              onClick={() => setShowDemo(false)}
+              className="absolute top-4 right-4 z-10 size-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 grid place-items-center text-white hover:bg-black/80 transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
