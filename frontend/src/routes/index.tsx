@@ -67,12 +67,7 @@ function Landing() {
             MediQueue replaces chaotic paper trails and legacy software with a calm, high-performance view of your entire clinical practice.
           </p>
           <div className="mt-12 flex flex-wrap gap-5 items-center">
-            <Link
-              to="/register"
-              className="group inline-flex items-center gap-3 rounded-2xl bg-brand text-brand-foreground px-8 py-4 text-xs font-black uppercase tracking-widest shadow-2xl shadow-brand/40 hover:scale-105 transition-all shimmer-sweep"
-            >
-              Start Free Trial <MoveRight className="size-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
+          
 
             {/* Explore Demo — highlighted */}
             <div className="relative inline-flex" style={{ animation: "float 3s ease-in-out infinite" }}>
