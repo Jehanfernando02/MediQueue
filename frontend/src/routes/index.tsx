@@ -39,11 +39,11 @@ function Landing() {
             <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground">Clinical OS</div>
           </div>
         </div>
-        <nav className="hidden md:flex items-center gap-10 text-[10px] uppercase tracking-widest font-black text-muted-foreground">
+        {/* <nav className="hidden md:flex items-center gap-10 text-[10px] uppercase tracking-widest font-black text-muted-foreground">
           <a href="#features" className="hover:text-brand transition-colors">Product</a>
           <a href="#teams" className="hover:text-brand transition-colors">For teams</a>
           <a href="#security" className="hover:text-brand transition-colors">Security</a>
-        </nav>
+        </nav> */}
         <div className="flex items-center gap-6">
           <Link to="/login" className="text-[10px] uppercase tracking-widest font-black text-muted-foreground hover:text-brand transition-colors">
             Sign in
@@ -81,7 +81,7 @@ function Landing() {
               to="/login"
               className="inline-flex items-center gap-3 rounded-2xl border border-border bg-card/40 backdrop-blur-md px-8 py-4 text-xs font-black uppercase tracking-widest hover:bg-muted transition-all shadow-sm"
             >
-              Sign In
+              Explore Demo
             </Link>
           </div>
           <div className="mt-16 flex items-center gap-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
@@ -153,11 +153,11 @@ function Landing() {
             <Heart className="size-4 text-brand" />
             <span>© {new Date().getFullYear()} MediQueue, Inc. All rights reserved.</span>
           </div>
-          <div className="flex items-center gap-10">
+          {/* <div className="flex items-center gap-10">
             <a href="#" className="hover:text-brand transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-brand transition-colors">Terms of Service</a>
             <a href="#" className="hover:text-brand transition-colors">Contact Sales</a>
-          </div>
+          </div> */}
         </div>
       </footer>
     </div>
