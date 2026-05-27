@@ -70,31 +70,31 @@ function Landing() {
           
 
             {/* Explore Demo — highlighted */}
-            <div className="relative inline-flex" style={{ animation: "float 3s ease-in-out infinite" }}>
-              {/* Ping rings */}
-              <span className="absolute -inset-[3px] rounded-[18px] border border-clinical/40 animate-ping" style={{ animationDuration: "2s" }} />
-              <span className="absolute -inset-[7px] rounded-[22px] border border-clinical/20 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.5s" }} />
+<div className="relative inline-flex" style={{ animation: "float 3s ease-in-out infinite" }}>
+  {/* Ping rings */}
+  <span className="absolute -inset-[3px] rounded-[18px] border-2 border-brand/50 animate-ping" style={{ animationDuration: "2s" }} />
+  <span className="absolute -inset-[7px] rounded-[22px] border border-brand/25 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.5s" }} />
 
-              <button
-                onClick={() => setShowDemo(true)}
-                className="group relative z-10 inline-flex items-center gap-3 rounded-2xl border border-clinical/40 bg-card/40 backdrop-blur-md px-8 py-4 text-xs font-black uppercase tracking-widest hover:bg-muted transition-all shadow-[0_0_20px_rgba(0,0,0,0.08)] hover:shadow-[0_0_28px_color-mix(in_oklab,var(--clinical)_30%,transparent)] hover:border-clinical/60 hover:scale-105 cursor-pointer"
-              >
-                {/* Play icon */}
-                <span className="size-6 rounded-full bg-clinical/15 border border-clinical/40 grid place-items-center flex-shrink-0 group-hover:bg-clinical/25 transition-colors">
-                  <svg width="8" height="9" viewBox="0 0 8 9" fill="none">
-                    <path d="M1 1L7 4.5L1 8V1Z" fill="currentColor" className="text-clinical" />
-                  </svg>
-                </span>
+  <button
+    onClick={() => setShowDemo(true)}
+    className="group relative z-10 inline-flex items-center gap-3 rounded-2xl border-2 border-brand/60 bg-brand/10 px-8 py-4 text-xs font-black uppercase tracking-widest text-brand hover:bg-brand/20 hover:border-brand hover:scale-105 transition-all shadow-[0_0_0_4px_color-mix(in_oklab,var(--brand)_10%,transparent)] hover:shadow-[0_8px_32px_color-mix(in_oklab,var(--brand)_30%,transparent)] cursor-pointer"
+  >
+    {/* Play icon */}
+    <span className="size-7 rounded-full bg-brand/20 border-2 border-brand/50 grid place-items-center flex-shrink-0 group-hover:bg-brand/30 group-hover:scale-110 transition-all">
+      <svg width="8" height="9" viewBox="0 0 8 9" fill="none">
+        <path d="M1 1L7 4.5L1 8V1Z" fill="currentColor" />
+      </svg>
+    </span>
 
-                <span className="flex flex-col leading-tight text-left">
-                  <span>Explore Demo</span>
-                  <span className="text-[9px] font-bold tracking-wider text-clinical/70 normal-case">Watch live walkthrough</span>
-                </span>
+    <span className="flex flex-col leading-tight text-left">
+      <span className="text-foreground font-black">Explore Demo</span>
+      <span className="text-[9px] font-bold tracking-wider text-brand normal-case">Watch live walkthrough</span>
+    </span>
 
-                {/* Live dot */}
-                <span className="size-2 rounded-full bg-clinical animate-pulse flex-shrink-0" />
-              </button>
-            </div>
+    {/* Live dot */}
+    <span className="size-2.5 rounded-full bg-brand animate-pulse flex-shrink-0 shadow-[0_0_8px_var(--brand)]" />
+  </button>
+</div>
           </div>
           <div className="mt-16 flex items-center gap-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
             <div className="flex items-center gap-2"><Activity className="size-4 text-clinical" /> REAL-TIME QUEUE</div>
