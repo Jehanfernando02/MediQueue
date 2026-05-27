@@ -269,8 +269,9 @@ class DoctorService:
 
             while current_start < final_end:
                 current_end = current_start + timedelta(minutes=30)
+                # If current_end exceeds final_end, use final_end instead
                 if current_end > final_end:
-                    break
+                    current_end = final_end
 
                 slot = TimeSlot(
                     doctor_id=dr_uuid,
