@@ -15,7 +15,13 @@ export const Route = createFileRoute("/doctor/schedule")({
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const HOURS = ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17"];
+const HOURS = ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22"];
+const TIME_SLOTS = [
+  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30",
+  "20:00", "20:30", "21:00", "21:30", "22:00"
+];
 
 interface TempSlot {
   day_of_week: number;
@@ -167,6 +173,65 @@ function Schedule() {
     toast.success("Loaded default 30-minute schedule template");
   };
 
+  const toggleSlot = (day: number, time: string) => {
+    const timeIndex = TIME_SLOTS.indexOf(time);
+    if (timeIndex === -1) return;
+    
+    const nextTime = TIME_SLOTS[timeIndex + 1];
+    if (!nextTime) return;
+
+    const existingSlotIndex = tempSlots.findIndex(
+      s => s.day_of_week === day && s.start_time === time && s.end_time === nextTime
+    );
+
+    if (existingSlotIndex !== -1) {
+      setTempSlots(tempSlots.filter((_, i) => i !== existingSlotIndex));
+    } else {
+      setTempSlots([...tempSlots, { day_of_week: day, start_time: time, end_time: nextTime }]);
+    }
+  };
+
+  const isSlotSelected = (day: number, time: string) => {
+    const timeIndex = TIME_SLOTS.indexOf(time);
+    if (timeIndex === -1) return false;
+    
+    const nextTime = TIME_SLOTS[timeIndex + 1];
+    if (!nextTime) return false;
+
+    return tempSlots.some(
+      s => s.day_of_week === day && s.start_time === time && s.end_time === nextTime
+    );
+  };
+
+  const selectTimeRange = (day: number, startHour: number, endHour: number) => {
+    const startTime = `${startHour.toString().padStart(2, '0')}:00`;
+    const endTime = `${endHour.toString().padStart(2, '0')}:00`;
+    
+    // Remove existing slots in this range
+    const filteredSlots = tempSlots.filter(s => {
+      if (s.day_of_week !== day) return true;
+      return !(s.start_time >= startTime && s.end_time <= endTime);
+    });
+
+    // Add new 30-minute slots for the range
+    const newSlots = [...filteredSlots];
+    let current = startHour;
+    while (current < endHour) {
+      const slotStart = `${current.toString().padStart(2, '0')}:00`;
+      const slotEnd = `${current.toString().padStart(2, '0')}:30`;
+      newSlots.push({ day_of_week: day, start_time: slotStart, end_time: slotEnd });
+      current += 0.5;
+    }
+
+    setTempSlots(newSlots);
+    toast.success(`Selected ${startHour}:00 - ${endHour}:00 for ${ALL_DAYS[day]}`);
+  };
+
+  const clearDay = (day: number) => {
+    setTempSlots(tempSlots.filter(s => s.day_of_week !== day));
+    toast.success(`Cleared all slots for ${ALL_DAYS[day]}`);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     // Format times to HH:MM:00 for the backend
@@ -270,106 +335,145 @@ function Schedule() {
 
       {/* Edit Availability Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-xl rounded-2xl">
+        <DialogContent className="max-w-4xl rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold tracking-tight">Edit Weekly Availability</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">Click on time slots to toggle availability. Use quick actions for bulk changes.</p>
           </DialogHeader>
 
           {/* Weekday Selector */}
-          <div className="flex border-b border-border my-2 overflow-x-auto no-scrollbar">
+          <div className="flex border-b border-border my-4 overflow-x-auto no-scrollbar sticky top-0 bg-background z-10">
             {ALL_DAYS.map((dayName, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => setActiveDay(idx)}
                 className={[
-                  "px-3.5 py-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors cursor-pointer",
+                  "px-4 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors cursor-pointer",
                   activeDay === idx ? "border-brand text-brand" : "border-transparent text-muted-foreground hover:text-foreground"
                 ].join(" ")}
               >
-                {dayName.slice(0, 3)}
+                {dayName}
               </button>
             ))}
           </div>
 
-          {/* Current Slots for Active Day */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Slots for {ALL_DAYS[activeDay]}
-            </h4>
-
-            {daySlots.length === 0 ? (
-              <div className="py-10 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl bg-muted/5">
-                No slots configured for this day. Patients won't be able to book you.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
-                {daySlots.map((s, idx) => (
-                  <div key={idx} className="flex items-center justify-between px-3 py-2 rounded-xl bg-card border border-border shadow-sm">
-                    <span className="text-xs font-mono font-semibold flex items-center gap-1.5 text-foreground/90">
-                      <Clock className="size-3.5 text-brand" />
-                      {s.start_time} - {s.end_time}
-                    </span>
-                    <button
-                      onClick={() => deleteSlot(s)}
-                      className="p-1 rounded-lg hover:bg-danger-soft hover:text-danger text-muted-foreground transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Quick Actions for Active Day */}
+          <div className="flex flex-wrap gap-2 mb-4 p-3 rounded-xl bg-muted/30 border border-border/60">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground self-center mr-2">Quick Actions:</span>
+            <button
+              type="button"
+              onClick={() => selectTimeRange(activeDay, 9, 12)}
+              className="px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-brand hover:text-brand-foreground text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Morning (9AM-12PM)
+            </button>
+            <button
+              type="button"
+              onClick={() => selectTimeRange(activeDay, 14, 17)}
+              className="px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-brand hover:text-brand-foreground text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Afternoon (2PM-5PM)
+            </button>
+            <button
+              type="button"
+              onClick={() => selectTimeRange(activeDay, 9, 17)}
+              className="px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-brand hover:text-brand-foreground text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Full Day (9AM-5PM)
+            </button>
+            <button
+              type="button"
+              onClick={() => selectTimeRange(activeDay, 9, 22)}
+              className="px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-brand hover:text-brand-foreground text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Extended (9AM-10PM)
+            </button>
+            <button
+              type="button"
+              onClick={() => clearDay(activeDay)}
+              className="px-3 py-1.5 rounded-lg bg-card border border-border hover:bg-danger-soft hover:text-danger text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Clear Day
+            </button>
           </div>
 
-          {/* Add Slot Block */}
-          <div className="p-4 rounded-2xl bg-muted/30 border border-border/60">
-            <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">Add Custom Slot</h5>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">Start</label>
-                <input
-                  type="time"
-                  value={newStart}
-                  onChange={(e) => setNewStart(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border outline-none focus:ring-2 focus:ring-brand/20 text-xs font-semibold"
-                />
+          {/* Visual Time Grid */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Time Slots for {ALL_DAYS[activeDay]}
+            </h4>
+
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+              {TIME_SLOTS.slice(0, -1).map((time) => {
+                const isSelected = isSlotSelected(activeDay, time);
+                return (
+                  <button
+                    key={time}
+                    type="button"
+                    onClick={() => toggleSlot(activeDay, time)}
+                    className={[
+                      "px-2 py-2 rounded-lg border text-[10px] font-mono font-semibold transition-all cursor-pointer",
+                      isSelected
+                        ? "bg-brand text-brand-foreground border-brand shadow-md shadow-brand/20"
+                        : "bg-card border-border text-muted-foreground hover:bg-muted"
+                    ].join(" ")}
+                  >
+                    {time}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Slots Summary */}
+            <div className="mt-4 p-3 rounded-xl bg-muted/20 border border-border/60">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Selected Slots ({daySlots.length})
+                </h5>
+                <button
+                  type="button"
+                  onClick={() => clearDay(activeDay)}
+                  className="text-[10px] font-bold uppercase tracking-wider text-danger hover:underline cursor-pointer"
+                >
+                  Clear All
+                </button>
               </div>
-              <div className="flex-1">
-                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">End</label>
-                <input
-                  type="time"
-                  value={newEnd}
-                  onChange={(e) => setNewEnd(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-card border border-border outline-none focus:ring-2 focus:ring-brand/20 text-xs font-semibold"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => addSlot(activeDay)}
-                className="px-4 py-2.5 rounded-xl bg-brand text-brand-foreground text-xs font-bold uppercase tracking-wider hover:opacity-90 shadow-md shadow-brand/10 transition-all flex items-center gap-1.5 h-9 cursor-pointer"
-              >
-                <Plus className="size-3.5" /> Add
-              </button>
+              {daySlots.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No slots selected</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {daySlots.map((s, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-brand/10 text-brand border border-brand/20 text-[10px] font-mono"
+                    >
+                      {s.start_time}-{s.end_time}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex justify-between gap-2 pt-2 border-t border-border">
-            <button
-              type="button"
-              onClick={() => copyToAllDays(activeDay)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-            >
-              <Copy className="size-3.5" /> Copy Day Schedule
-            </button>
-            <button
-              type="button"
-              onClick={loadDefaults}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-            >
-              <RotateCcw className="size-3.5" /> Reset Defaults
-            </button>
+          {/* Bulk Actions */}
+          <div className="flex flex-wrap justify-between gap-2 pt-4 border-t border-border mt-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => copyToAllDays(activeDay)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+              >
+                <Copy className="size-3.5" /> Copy to All Days
+              </button>
+              <button
+                type="button"
+                onClick={loadDefaults}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border hover:bg-muted text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+              >
+                <RotateCcw className="size-3.5" /> Load Defaults
+              </button>
+            </div>
           </div>
 
           <DialogFooter className="mt-4">
@@ -387,7 +491,7 @@ function Schedule() {
               className="px-5 py-2.5 rounded-xl bg-brand text-brand-foreground text-xs font-bold uppercase tracking-wider hover:opacity-90 shadow-lg shadow-brand/20 transition-all flex items-center gap-2 cursor-pointer"
             >
               {saving && <Loader2 className="size-3.5 animate-spin" />}
-              Save Changes
+              Save Changes ({tempSlots.length} slots)
             </button>
           </DialogFooter>
         </DialogContent>
