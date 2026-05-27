@@ -290,3 +290,8 @@
     box-shadow: 0 20px 40px -12px color-mix(in oklab, var(--brand) 25%, transparent);
   }
 }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-4px); }
+}
