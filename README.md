@@ -1,16 +1,148 @@
 # MediQueue
 
+[![CI](https://github.com/Jehanfernando02/MediQueue/actions/workflows/ci.yml/badge.svg)](https://github.com/Jehanfernando02/MediQueue/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
 A clinical appointment and patient flow management system for small clinics and hospitals. Three fully separated roles — **Patient**, **Doctor**, **Admin** — each with distinct access controls, real-time queue tracking, and a normalized PostgreSQL schema.
+
+**Live Deployments**
+| Service | URL |
+|---|---|
+| 🌐 Frontend (Vercel) | https://medi-queue.vercel.app |
+| ⚙️ Backend API (Render) | https://mediqueue.onrender.com |
+| 📖 API Docs (Swagger) | https://mediqueue.onrender.com/api/docs |
+| 💚 Health Check | https://mediqueue.onrender.com/api/health |
 
 ---
 
-## The Idea
+## DevOps Skills Demonstrated
 
-Small clinics run on whiteboards and phone calls. MediQueue replaces that with a role-aware web app where:
+This project is engineered with production-grade DevOps practices throughout:
 
-- **Patients** search doctors, book slots, and watch their queue position live
-- **Doctors** manage today's patient queue, update statuses, and write consultation notes
-- **Admins** oversee the entire clinic — doctors, departments, appointments, reports, and an immutable audit log
+| Skill Area | Implementation |
+|---|---|
+| **CI/CD Pipelines** | GitHub Actions (`.github/workflows/ci.yml`) — backend pytest + frontend build run on every push/PR |
+| **Containerisation** | Multi-stage `Dockerfile` (builder + slim runtime), non-root user, OCI labels |
+| **Container Orchestration** | `docker-compose.yml` — API + PostgreSQL + Redis with `service_healthy` startup ordering |
+| **Infrastructure as Code** | `render.yaml` (Render IaC), `docker-compose.yml`, `Jenkinsfile` all define infra declaratively |
+| **Jenkins / Groovy** | `Jenkinsfile` — declarative Groovy pipeline with parallel stages, `timestamps()`, `timeout()`, `githubPush()` trigger |
+| **Python Scripting** | `scripts/health_monitor.py` — zero-dependency stdlib health monitor with CI exit codes and `--watch` mode |
+| **Health Monitoring** | `/api/health` endpoint + Python script + Docker `HEALTHCHECK` instruction |
+| **Cloud Deployment** | Production hosted on Render (backend) + Vercel (frontend) with auto-deploy on push |
+| **Documentation** | Architecture diagrams, API reference, deployment guides, runbooks |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        GitHub Repository                        │
+│                                                                 │
+│  push/PR → GitHub Actions CI                                    │
+│              ├── backend-ci  (Python/pytest + PostgreSQL svc)   │
+│              ├── frontend-ci (Node/ESLint/Vite build)           │
+│              └── docker-build (verify both Dockerfiles compile) │
+└────────────────────────┬────────────────────────────────────────┘
+                         │ auto-deploy on merge
+          ┌──────────────┴──────────────┐
+          ▼                             ▼
+┌──────────────────┐         ┌──────────────────────┐
+│  Vercel          │         │  Render              │
+│  (Frontend)      │         │  (Backend)           │
+│                  │  HTTPS  │                      │
+│  React 19        │◄───────►│  FastAPI + Uvicorn   │
+│  TanStack Router │         │  Gunicorn (4 workers)│
+│  Redux Toolkit   │         │  Alembic migrations  │
+└──────────────────┘         └─────────┬────────────┘
+                                       │
+                    ┌──────────────────┼──────────────────┐
+                    ▼                  ▼                  ▼
+             ┌────────────┐   ┌──────────────┐   ┌─────────────┐
+             │ PostgreSQL │   │    Redis 7   │   │   Celery    │
+             │ 16 (Neon)  │   │  (cache +    │   │  Workers    │
+             │            │   │  JWT store)  │   │ (reminders) │
+             └────────────┘   └──────────────┘   └─────────────┘
+```
+
+**Local Dev (Docker Compose):**
+```
+docker compose up  →  mediqueue-db + mediqueue-redis → mediqueue-api
+                       (health-checked)    (health-checked)   (waits for both)
+```
+
+---
+
+## CI/CD Pipeline
+
+### GitHub Actions (`.github/workflows/ci.yml`)
+
+```
+On push / PR to main
+      │
+      ├── Job: backend-ci
+      │     ├── Spin up PostgreSQL 16 service container
+      │     ├── pip install -r requirements.txt
+      │     ├── alembic upgrade head
+      │     ├── pytest tests/ -v
+      │     └── Boot Uvicorn + curl /api/health
+      │
+      ├── Job: frontend-ci
+      │     ├── npm ci
+      │     ├── eslint .
+      │     └── vite build  → uploads dist/ as artifact
+      │
+      └── Job: docker-build (after both pass)
+            ├── Build backend Docker image
+            └── Build frontend Docker image
+```
+
+### Jenkins Pipeline (`Jenkinsfile`)
+
+Groovy declarative pipeline for self-hosted or EC2 deployments:
+
+```
+Checkout → Install Deps → Parallel(Tests + Frontend Build)
+  → Docker Build → Docker Compose Deploy → Health Check → Cleanup
+```
+
+Triggered via `githubPush()` + GitHub webhook.
+
+---
+
+## Health Monitoring
+
+### `/api/health` endpoint
+
+```json
+GET https://mediqueue.onrender.com/api/health
+
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "env": "production"
+}
+```
+
+Returns `200 OK` when healthy. Used by: Docker `HEALTHCHECK`, Python monitor script, Jenkins post-deploy stage.
+
+### Python health monitor (`scripts/health_monitor.py`)
+
+```bash
+# Single check — exits 0 on success, 1 on failure (CI-compatible)
+python3 scripts/health_monitor.py
+
+# Custom URL
+python3 scripts/health_monitor.py --url https://mediqueue.onrender.com/api/health
+
+# Continuous watch mode — alerts after 3 consecutive failures
+python3 scripts/health_monitor.py --watch --interval 30 --max-failures 3
+```
+
+Zero external dependencies — pure Python stdlib.
 
 ---
 
@@ -18,14 +150,17 @@ Small clinics run on whiteboards and phone calls. MediQueue replaces that with a
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19 · TanStack Start · TanStack Router · Redux Toolkit · Axios |
+| Frontend | React 19 · TanStack Router · Redux Toolkit · Axios · Vite |
 | Backend | FastAPI · SQLAlchemy 2.0 (async) · Pydantic v2 |
 | Database | PostgreSQL 16 |
-| Cache / Queue | Redis 7 |
+| Cache / JWT Store | Redis 7 |
 | Auth | JWT (access + refresh) · bcrypt · token rotation in Redis |
-| Background tasks | Celery (reminders, nightly cron) |
+| Background tasks | Celery (appointment reminders, nightly cron) |
 | Migrations | Alembic |
-| Infra | Docker Compose |
+| Containerisation | Docker · Docker Compose |
+| CI/CD | GitHub Actions · Jenkins (Groovy) |
+| Deployment | Vercel (frontend) · Render (backend) |
+| Monitoring | Python health monitor script · Docker HEALTHCHECK |
 
 ---
 
@@ -42,24 +177,109 @@ Patient    → book appointments · view history · live queue position · notif
 ## Project Structure
 
 ```
-mediwave-prime/
-├── frontend/          # TanStack Start (React 19)
-│   └── src/
-│       ├── routes/    # 21 pages across 3 role dashboards
-│       ├── store/     # Redux slices + Axios client (Phase 4)
-│       └── lib/auth   # AuthProvider → migrates to Redux
+MediQueue/
+├── .github/
+│   └── workflows/
+│       └── ci.yml              ← GitHub Actions CI pipeline
 │
-└── backend/           # FastAPI
-    ├── app/
-    │   ├── models/    # 9 SQLAlchemy tables
-    │   ├── routers/   # Thin route handlers
-    │   ├── services/  # Business logic layer
-    │   ├── schemas/   # Pydantic request/response
-    │   ├── middleware/ # Auth · RBAC · RequestID · Logging
-    │   └── utils/     # JWT · bcrypt · exceptions · response
-    ├── alembic/       # DB migrations
-    ├── docker-compose.yml
-    └── .env.dev
+├── frontend/                   ← React 19 SPA
+│   ├── Dockerfile              ← Multi-stage (Node builder + Nginx runtime)
+│   ├── nginx.conf              ← SPA routing + security headers
+│   ├── vercel.json             ← Vercel routing rules
+│   └── src/
+│       ├── routes/             ← 21 pages across 3 role dashboards
+│       └── store/              ← Redux slices + Axios client
+│
+├── backend/                    ← FastAPI
+│   ├── Dockerfile              ← Multi-stage (builder + slim runtime, non-root user)
+│   ├── docker-compose.yml      ← API + PostgreSQL + Redis (health-checked)
+│   ├── pytest.ini              ← Test configuration
+│   ├── render.yaml             ← Render deployment IaC
+│   ├── tests/
+│   │   ├── conftest.py         ← pytest fixtures
+│   │   └── test_health.py      ← 11 smoke tests for /api/health
+│   └── app/
+│       ├── main.py             ← FastAPI app factory + /api/health
+│       ├── models/             ← 9 SQLAlchemy tables
+│       ├── routers/            ← Thin route handlers
+│       ├── services/           ← Business logic layer
+│       ├── schemas/            ← Pydantic request/response
+│       ├── middleware/         ← Auth · RBAC · RequestID · Audit · RateLimit
+│       └── utils/              ← JWT · bcrypt · exceptions
+│
+├── scripts/
+│   └── health_monitor.py       ← Python CLI health monitor (stdlib only)
+│
+└── Jenkinsfile                 ← Groovy declarative CI/CD pipeline
+```
+
+---
+
+## Local Setup
+
+### Prerequisites
+- Docker & Docker Compose
+- Python 3.12+
+- Node.js 20+ / npm
+
+### Quickstart with Docker Compose
+
+```bash
+cd backend
+
+# Start all services — Postgres and Redis are health-checked before API starts
+docker compose up
+
+# API → http://localhost:8000
+# Swagger → http://localhost:8000/api/docs
+# Health  → http://localhost:8000/api/health
+```
+
+### Manual Backend Setup
+
+```bash
+cd backend
+
+# 1. Start Postgres + Redis only
+docker compose up db redis -d
+
+# 2. Create virtualenv and install deps
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Run migrations
+alembic upgrade head
+
+# 4. Start API
+uvicorn app.main:app --reload --port 8000
+```
+
+### Run Tests
+
+```bash
+cd backend
+source venv/bin/activate
+pytest tests/ -v
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev     # → http://localhost:5173
+npm run lint    # ESLint
+npm run build   # Production bundle
+```
+
+### Run Health Monitor
+
+```bash
+# Against local dev
+python3 scripts/health_monitor.py --url http://localhost:8000/api/health
+
+# Against production (Render)
+python3 scripts/health_monitor.py --url https://mediqueue.onrender.com/api/health --watch
 ```
 
 ---
@@ -80,7 +300,7 @@ audit_logs         → id, user_id, action, entity, metadata (JSONB)      ← IN
 
 ---
 
-## API Summary
+## API Reference
 
 ```
 POST   /api/v1/auth/register
@@ -101,56 +321,11 @@ GET    /api/v1/notifications            # patient notifications
 GET    /api/v1/admin/doctors            # admin CRUD
 GET    /api/v1/analytics/overview       # dashboard stats
 GET    /api/v1/audit-logs               # immutable audit trail
+
+GET    /api/health                      # health check (no auth required)
 ```
 
----
-
-## Local Setup
-
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.12+
-- Node.js 20+ / Bun
-
-### Backend
-
-```bash
-cd backend
-
-# 1. Start Postgres + Redis
-docker-compose up db redis -d
-
-# 2. Create virtualenv and install deps
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-
-# 3. Run migrations
-alembic revision --autogenerate -m "initial_schema"
-alembic upgrade head
-
-# 4. Start API
-uvicorn app.main:app --reload --port 8000
-# Swagger → http://localhost:8000/api/docs
-```
-
-### Frontend
-
-```bash
-cd frontend
-bun install
-bun dev
-# → http://localhost:5173
-```
-
-### pgAdmin connection
-
-| Field | Value |
-|---|---|
-| Host | `localhost` |
-| Port | `5432` |
-| Database | `mediqueue` |
-| Username | `mediqueue` |
-| Password | `mediqueue` |
+Full interactive docs: https://mediqueue.onrender.com/api/docs
 
 ---
 
@@ -166,6 +341,8 @@ bun dev
 
 **RBAC** — enforced at the service layer via a `require_roles()` dependency factory, not just at the route level.
 
+**Container startup ordering** — `docker-compose.yml` uses `depends_on: condition: service_healthy` so the API waits for pg_isready and redis-cli ping before starting, eliminating race-condition crashes.
+
 ---
 
 ## Build Phases
@@ -173,7 +350,6 @@ bun dev
 | Phase | Focus | Status |
 |---|---|---|
 | 1 | Backend foundation — auth, models, Alembic, middleware | ✅ Done |
-| 2 | Core services — doctors, appointments, queue, RBAC, audit, rate limiting | 🔄 Next |
-| 3 | Advanced — Redis cache, Celery tasks, analytics, tests, CI/CD | ⏳ |
-| 4 | Frontend integration — Redux slices, Axios interceptors, replace all mock data | ⏳ |
-# update
+| 2 | Core services — doctors, appointments, queue, RBAC, audit, rate limiting | ✅ Done |
+| 3 | DevOps — CI/CD (GitHub Actions + Jenkins), Docker, health monitoring, tests | ✅ Done |
+| 4 | Frontend integration — Redux slices, Axios interceptors, replace all mock data | 🔄 In Progress |
