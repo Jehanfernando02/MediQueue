@@ -41,6 +41,11 @@ def upgrade() -> None:
     op.execute('DROP TABLE IF EXISTS users CASCADE')
     op.execute('DROP TABLE IF EXISTS departments CASCADE')
     
+    # Recreate ENUM types first — they were dropped above with CASCADE
+    op.execute("CREATE TYPE userrole AS ENUM ('patient', 'doctor', 'admin')")
+    op.execute("CREATE TYPE doctorstatus AS ENUM ('active', 'on_leave', 'inactive')")
+    op.execute("CREATE TYPE appointmentstatus AS ENUM ('scheduled', 'arrived', 'in_progress', 'done', 'cancelled', 'no_show')")
+
     # Recreate tables with UUID columns (same as f833decff7b8)
     op.create_table('departments',
     sa.Column('id', sa.UUID(), nullable=False),

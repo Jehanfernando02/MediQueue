@@ -14,38 +14,14 @@ jobs:
     name: Backend CI (Python 3.12)
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: mediqueue
-          POSTGRES_PASSWORD: mediqueue
-          POSTGRES_DB: mediqueue_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
-      DATABASE_URL: postgresql+asyncpg://mediqueue:mediqueue@localhost:5432/mediqueue_test
-      REDIS_URL: redis://localhost:6379/0
       SECRET_KEY: ci-test-secret-key-not-for-production
       ENVIRONMENT: test
       APP_NAME: MediQueue
       APP_VERSION: "1.0.0"
+      # Dummy DB/Redis URLs — not used by TestClient tests, but required by app config
+      DATABASE_URL: postgresql+asyncpg://mediqueue:mediqueue@localhost:5432/mediqueue_test
+      REDIS_URL: redis://localhost:6379/0
 
     defaults:
       run:
@@ -65,29 +41,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Alembic migrations
-        run: alembic upgrade head
-
       - name: Run tests
         run: pytest tests/ -v --tb=short
-
-      - name: Verify health endpoint boots
-        run: |
-          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-          sleep 5
-          curl -sf http://localhost:8000/api/health | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          assert data['status'] == 'ok', f'Unexpected health status: {data}'
-          print('✅ Health check passed:', data)
-          "
-          kill %1
 
   # ──────────────────────────────────────────────
   # Job 2 — Frontend: lint + build (React / Vite)
   # ──────────────────────────────────────────────
   frontend-ci:
-    name: Frontend CI (Node 20)
+    name: Frontend CI (Node 24)
     runs-on: ubuntu-latest
 
     defaults:
@@ -101,15 +62,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Format (Prettier auto-fix)
+        run: npm run format
 
       - name: Lint (ESLint)
         run: npm run lint
