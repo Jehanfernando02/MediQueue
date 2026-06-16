@@ -1,8 +1,26 @@
 version: "3.9"
 
+# ──────────────────────────────────────────────────────────────────────────
+# MediQueue — Local Development Stack
+# ──────────────────────────────────────────────────────────────────────────
+# Usage:
+#   docker compose up           # start all services
+#   docker compose up -d        # detached mode
+#   docker compose down         # stop and remove containers
+#   docker compose logs -f api  # tail API logs
+#
+# Services:
+#   db    — PostgreSQL 16 (port 5432)
+#   redis — Redis 7       (port 6379)
+#   api   — FastAPI       (port 8000)  depends on db + redis being healthy
+# ──────────────────────────────────────────────────────────────────────────
+
 services:
+
   db:
     image: postgres:16-alpine
+    container_name: mediqueue-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: mediqueue
       POSTGRES_PASSWORD: mediqueue
@@ -11,25 +29,49 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediqueue -d mediqueue"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
+    container_name: mediqueue-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: mediqueue-api
+    restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - .:/app
+      - .:/app                # live reload — remove in production
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://mediqueue:mediqueue@db:5432/mediqueue
-      - REDIS_URL=redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://mediqueue:mediqueue@db:5432/mediqueue
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      DEBUG: "true"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy   # wait for pg_isready before starting
+      redis:
+        condition: service_healthy   # wait for redis-cli ping before starting
 
 volumes:
   postgres_data:
+    driver: local
