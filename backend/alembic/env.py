@@ -16,8 +16,18 @@ import app.models  # noqa: F401 — registers all ORM models with Base.metadata
 config = context.config
 
 # Override sqlalchemy.url from Pydantic settings
-# asyncpg → psycopg2 for sync Alembic operations
-sync_url = settings.DATABASE_URL.replace("+asyncpg", "+psycopg2")
+# Normalise to a sync psycopg2 URL regardless of how DATABASE_URL is specified:
+#   postgresql://...          → postgresql+psycopg2://...
+#   postgresql+asyncpg://...  → postgresql+psycopg2://...
+#   postgresql+psycopg2://... → unchanged (already correct)
+_db_url = settings.DATABASE_URL
+if "+asyncpg" in _db_url:
+    sync_url = _db_url.replace("+asyncpg", "+psycopg2")
+elif "+psycopg2" in _db_url:
+    sync_url = _db_url  # already correct
+else:
+    # bare postgresql:// — insert the psycopg2 driver
+    sync_url = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 config.set_main_option("sqlalchemy.url", sync_url)
 
 if config.config_file_name is not None:
