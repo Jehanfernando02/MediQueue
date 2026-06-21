@@ -37,7 +37,7 @@ function Login() {
   const status = useAppSelector(selectAuthStatus);
   const apiError = useAppSelector(selectAuthError);
 
-  const [role, setRole] = useState<Role>("doctor");
+  const [role, setRole] = useState<Role | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -56,6 +56,8 @@ function Login() {
     if (result.success) {
       toast.success("Welcome back", { description: `Signed in as ${result.user.role}` });
       navigate({ to: homeForRole(result.user.role) });
+    } else {
+      toast.error("Sign in failed", { description: result.error ?? "Invalid email or password" });
     }
   };
 
@@ -131,105 +133,118 @@ function Login() {
             <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-brand to-clinical opacity-80" />
 
             {/* Role Cards */}
-            <div className="grid grid-cols-3 gap-3 mb-8">
-              {ROLES.map((r, i) => {
-                const Icon = r.icon;
-                const active = role === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setRole(r.id)}
-                    className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 group relative overflow-hidden",
-                      active
-                        ? "border-brand bg-brand/5 shadow-lg shadow-brand/10 ring-2 ring-brand/20"
-                        : "border-border bg-card/40 hover:border-brand/30 hover:bg-muted/40"
-                    )}
-                  >
-                    <div className={cn(
-                      "size-10 rounded-xl grid place-items-center transition-all",
-                      active ? "bg-brand text-white shadow-lg" : "bg-muted text-muted-foreground group-hover:text-brand"
-                    )}>
-                      <Icon className="size-5" />
-                    </div>
-                    <span className={cn("text-[10px] font-black uppercase tracking-widest", active ? "text-brand" : "text-muted-foreground")}>
-                      {r.title}
-                    </span>
-                    {active && <div className="absolute top-0 right-0 p-1"><CheckCircle2 className="size-3 text-brand" /></div>}
-                  </button>
-                );
-              })}
+            <div className="mb-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 mb-3">
+                {role ? "Role selected" : "Select your role to continue"}
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {ROLES.map((r) => {
+                  const Icon = r.icon;
+                  const active = role === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setRole(r.id)}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 group relative overflow-hidden",
+                        active
+                          ? "border-brand bg-brand/5 shadow-lg shadow-brand/10 ring-2 ring-brand/20"
+                          : "border-border bg-card/40 hover:border-brand/30 hover:bg-muted/40"
+                      )}
+                    >
+                      <div className={cn(
+                        "size-10 rounded-xl grid place-items-center transition-all",
+                        active ? "bg-brand text-white shadow-lg" : "bg-muted text-muted-foreground group-hover:text-brand"
+                      )}>
+                        <Icon className="size-5" />
+                      </div>
+                      <span className={cn("text-[10px] font-black uppercase tracking-widest", active ? "text-brand" : "text-muted-foreground")}>
+                        {r.title}
+                      </span>
+                      {active && <div className="absolute top-0 right-0 p-1"><CheckCircle2 className="size-3 text-brand" /></div>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Error banner */}
-            {apiError && (
-              <div className="mb-6 flex items-center gap-3 rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-xs font-bold text-destructive animate-in fade-in slide-in-from-top-2">
-                <AlertCircle className="size-4 shrink-0" />
-                {apiError}
+            {/* Divider shown only after role picked */}
+            {role && <div className="border-t border-border my-6" />}
+
+            {/* Fields only shown after role is selected */}
+            {role && (
+              <div className="animate-in fade-in slide-in-from-top-3 duration-300">
+                {/* Error banner */}
+                {apiError && (
+                  <div className="mb-6 flex items-center gap-3 rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-xs font-bold text-destructive animate-in fade-in slide-in-from-top-2">
+                    <AlertCircle className="size-4 shrink-0" />
+                    {apiError}
+                  </div>
+                )}
+
+                <form onSubmit={onSubmit} className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                      Email address
+                    </label>
+                    <div className="relative group">
+                      <input
+                        id="login-email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@clinic.org"
+                        className="w-full px-5 py-3.5 rounded-2xl bg-muted/40 border border-border outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-semibold placeholder:text-muted-foreground/40"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between ml-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setForgotOpen(true)}
+                        className="text-[10px] font-black uppercase tracking-widest text-brand hover:opacity-70"
+                      >
+                        Forgot?
+                      </button>
+                    </div>
+                    <div className="relative group">
+                      <input
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-5 py-3.5 rounded-2xl bg-muted/40 border border-border outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-semibold placeholder:text-muted-foreground/40 pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-brand transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    id="login-submit"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-14 inline-flex items-center justify-center gap-2 rounded-2xl bg-brand text-brand-foreground text-sm font-black uppercase tracking-widest shadow-2xl shadow-brand/40 hover:opacity-95 disabled:opacity-60 transition-all active:scale-[0.98] shimmer-sweep"
+                  >
+                    {loading ? "Verifying..." : <>Enter Dashboard <ArrowRight className="size-5 ml-1" /></>}
+                  </button>
+                </form>
               </div>
             )}
-
-            <form onSubmit={onSubmit} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
-                  Email address
-                </label>
-                <div className="relative group">
-                  <input
-                    id="login-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@clinic.org"
-                    className="w-full px-5 py-3.5 rounded-2xl bg-muted/40 border border-border outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-semibold placeholder:text-muted-foreground/40"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between ml-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setForgotOpen(true)}
-                    className="text-[10px] font-black uppercase tracking-widest text-brand hover:opacity-70"
-                  >
-                    Forgot?
-                  </button>
-                </div>
-                <div className="relative group">
-                  <input
-                    id="login-password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-5 py-3.5 rounded-2xl bg-muted/40 border border-border outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all text-sm font-semibold placeholder:text-muted-foreground/40 pr-12"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-brand transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                id="login-submit"
-                type="submit"
-                disabled={loading}
-                className="w-full h-14 inline-flex items-center justify-center gap-2 rounded-2xl bg-brand text-brand-foreground text-sm font-black uppercase tracking-widest shadow-2xl shadow-brand/40 hover:opacity-95 disabled:opacity-60 transition-all active:scale-[0.98] shimmer-sweep"
-              >
-                {loading ? "Verifying..." : <>Enter Dashboard <ArrowRight className="size-5 ml-1" /></>}
-              </button>
-            </form>
           </div>
 
           <p className="mt-8 text-sm text-center text-muted-foreground font-medium stagger-in" style={{ "--delay": "0.3s" } as any}>
