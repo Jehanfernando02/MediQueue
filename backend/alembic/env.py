@@ -61,24 +61,29 @@ def run_migrations_offline() -> None:
 # ── Online mode ────────────────────────────────────────────────────────────────
 def run_migrations_online() -> None:
     # Pass sslmode explicitly via connect_args for non-local connections.
-    # This is more reliable than appending it to the URL string, since some
-    # psycopg2 versions silently ignore the URL query-param form.
     ssl_args: dict = {"sslmode": "require"} if not _is_local else {}
 
+    # AUTOCOMMIT is required when connecting via a connection pooler
+    # (Supabase Supavisor / PgBouncer in transaction mode).
+    # Without it, the pooler cannot route DDL transactions and returns
+    # an ENOTFOUND / connection closed error.
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
         connect_args=ssl_args,
+        isolation_level="AUTOCOMMIT",
     )
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            # Each migration runs as its own implicit transaction under AUTOCOMMIT.
+            transaction_per_migration=True,
         )
-        with context.begin_transaction():
-            context.run_migrations()
+        context.run_migrations()
+
 
 
 if context.is_offline_mode():
