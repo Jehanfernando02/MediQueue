@@ -28,6 +28,14 @@ elif "+psycopg2" in _db_url:
 else:
     # bare postgresql:// — insert the psycopg2 driver
     sync_url = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+# Render Postgres (and most managed cloud Postgres) requires SSL.
+# Append sslmode=require for any non-local connection.
+_is_local = any(h in sync_url for h in ("localhost", "127.0.0.1", "@db:", "@postgres:"))
+if not _is_local and "sslmode" not in sync_url:
+    _sep = "&" if "?" in sync_url else "?"
+    sync_url += f"{_sep}sslmode=require"
+
 config.set_main_option("sqlalchemy.url", sync_url)
 
 if config.config_file_name is not None:
