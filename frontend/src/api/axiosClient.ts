@@ -54,7 +54,10 @@ function processQueue(error: unknown, token: string | null = null) {
   waitQueue = [];
 }
 
-// ── Response interceptor: silent refresh on 401 ──────────────────────────────
+// ── Auth routes that handle their own error UI (suppress global toast) ───────
+const SILENT_ERROR_URLS = ["/auth/login", "/auth/register", "/auth/refresh"];
+
+// ── Response interceptor: silent refresh on 401 + global error toasts ────────
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -102,8 +105,7 @@ api.interceptors.response.use(
         const newRefresh: string = data.data.refresh_token;
 
         store.dispatch(setTokens({ accessToken: newAccess, refreshToken: newRefresh }));
-        
-        // Persist the new refresh token for the next session
+
         if (typeof window !== "undefined") {
           localStorage.setItem("mediqueue.refresh_token", newRefresh);
         }
@@ -119,6 +121,43 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
+      }
+    }
+
+    // ── Global error toast for all other errors ─────────────────────────────
+    // Skip: auth routes (they show inline errors), network errors with no
+    // response (handled below), and already-retried requests.
+    const url: string = original?.url ?? "";
+    const isSilent = SILENT_ERROR_URLS.some((u) => url.includes(u));
+
+    if (!isSilent) {
+      if (error.response) {
+        // Server responded with an error status
+        const status: number = error.response.status;
+        const serverMessage: string =
+          error.response.data?.error?.message ??
+          error.response.data?.message ??
+          error.message;
+
+        const titles: Record<number, string> = {
+          400: "Bad request",
+          403: "Access denied",
+          404: "Not found",
+          409: "Conflict",
+          422: "Validation error",
+          429: "Too many requests",
+          500: "Server error",
+          503: "Service unavailable",
+        };
+
+        toast.error(titles[status] ?? `Error ${status}`, {
+          description: serverMessage,
+        });
+      } else if (error.request) {
+        // Request was made but no response received (network issue)
+        toast.error("Network error", {
+          description: "Could not reach the server. Check your connection.",
+        });
       }
     }
 
